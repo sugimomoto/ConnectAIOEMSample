@@ -56,20 +56,20 @@ class APIClient {
     return this.request('DELETE', `/connections/${connectionId}`);
   }
 
-  async getCatalogs(connectionId) {
-    return this.request('GET', `/metadata/catalogs?connection_id=${encodeURIComponent(connectionId)}`);
+  async getCatalogs() {
+    return this.request('GET', '/metadata/catalogs');
   }
 
-  async getSchemas(connectionId, catalogName) {
-    return this.request('GET', `/metadata/schemas?connection_id=${encodeURIComponent(connectionId)}&catalog_name=${encodeURIComponent(catalogName)}`);
+  async getSchemas(catalogName) {
+    return this.request('GET', `/metadata/schemas?catalog_name=${encodeURIComponent(catalogName)}`);
   }
 
-  async getTables(connectionId, catalogName, schemaName) {
-    return this.request('GET', `/metadata/tables?connection_id=${encodeURIComponent(connectionId)}&catalog_name=${encodeURIComponent(catalogName)}&schema_name=${encodeURIComponent(schemaName)}`);
+  async getTables(catalogName, schemaName) {
+    return this.request('GET', `/metadata/tables?catalog_name=${encodeURIComponent(catalogName)}&schema_name=${encodeURIComponent(schemaName)}`);
   }
 
-  async getColumns(connectionId, catalogName, schemaName, tableName) {
-    return this.request('GET', `/metadata/columns?connection_id=${encodeURIComponent(connectionId)}&catalog_name=${encodeURIComponent(catalogName)}&schema_name=${encodeURIComponent(schemaName)}&table_name=${encodeURIComponent(tableName)}`);
+  async getColumns(catalogName, schemaName, tableName) {
+    return this.request('GET', `/metadata/columns?catalog_name=${encodeURIComponent(catalogName)}&schema_name=${encodeURIComponent(schemaName)}&table_name=${encodeURIComponent(tableName)}`);
   }
 
   async getRecords(connectionId, catalog, schemaName, table, limit = 20, offset = 0) {
@@ -89,9 +89,8 @@ class APIClient {
     return this.request('DELETE', '/data/records', { connection_id: connectionId, catalog, schema_name: schemaName, table, where });
   }
 
-  async executeQuery(connectionId, catalogName, schemaName, tableName, columns, conditions) {
+  async executeQuery(catalogName, schemaName, tableName, columns, conditions) {
     return this.request('POST', '/query', {
-      connection_id: connectionId,
       catalog_name: catalogName,
       schema_name: schemaName,
       table_name: tableName,

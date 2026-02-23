@@ -20,11 +20,8 @@ def explorer_page():
 @api_v1_bp.route("/api/v1/metadata/catalogs", methods=["GET"])
 @login_required
 def get_catalogs():
-    connection_id = request.args.get("connection_id")
-    if not connection_id:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "connection_id は必須です"}}), 400
     try:
-        catalogs = metadata_service.get_catalogs(connection_id)
+        catalogs = metadata_service.get_catalogs()
     except ConnectAIError as e:
         return jsonify({"error": {"code": "CONNECT_AI_ERROR", "message": str(e)}}), 502
     return jsonify({"catalogs": catalogs}), 200
@@ -33,12 +30,11 @@ def get_catalogs():
 @api_v1_bp.route("/api/v1/metadata/schemas", methods=["GET"])
 @login_required
 def get_schemas():
-    connection_id = request.args.get("connection_id")
     catalog_name = request.args.get("catalog_name")
-    if not connection_id or not catalog_name:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "connection_id と catalog_name は必須です"}}), 400
+    if not catalog_name:
+        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "catalog_name は必須です"}}), 400
     try:
-        schemas = metadata_service.get_schemas(connection_id, catalog_name)
+        schemas = metadata_service.get_schemas(catalog_name)
     except ConnectAIError as e:
         return jsonify({"error": {"code": "CONNECT_AI_ERROR", "message": str(e)}}), 502
     return jsonify({"schemas": schemas}), 200
@@ -47,13 +43,12 @@ def get_schemas():
 @api_v1_bp.route("/api/v1/metadata/tables", methods=["GET"])
 @login_required
 def get_tables():
-    connection_id = request.args.get("connection_id")
     catalog_name = request.args.get("catalog_name")
     schema_name = request.args.get("schema_name")
-    if not connection_id or not catalog_name or not schema_name:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "connection_id / catalog_name / schema_name は必須です"}}), 400
+    if not catalog_name or not schema_name:
+        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "catalog_name / schema_name は必須です"}}), 400
     try:
-        tables = metadata_service.get_tables(connection_id, catalog_name, schema_name)
+        tables = metadata_service.get_tables(catalog_name, schema_name)
     except ConnectAIError as e:
         return jsonify({"error": {"code": "CONNECT_AI_ERROR", "message": str(e)}}), 502
     return jsonify({"tables": tables}), 200
@@ -62,14 +57,13 @@ def get_tables():
 @api_v1_bp.route("/api/v1/metadata/columns", methods=["GET"])
 @login_required
 def get_columns():
-    connection_id = request.args.get("connection_id")
     catalog_name = request.args.get("catalog_name")
     schema_name = request.args.get("schema_name")
     table_name = request.args.get("table_name")
-    if not connection_id or not catalog_name or not schema_name or not table_name:
-        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "connection_id / catalog_name / schema_name / table_name は必須です"}}), 400
+    if not catalog_name or not schema_name or not table_name:
+        return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "catalog_name / schema_name / table_name は必須です"}}), 400
     try:
-        columns = metadata_service.get_columns(connection_id, catalog_name, schema_name, table_name)
+        columns = metadata_service.get_columns(catalog_name, schema_name, table_name)
     except ConnectAIError as e:
         return jsonify({"error": {"code": "CONNECT_AI_ERROR", "message": str(e)}}), 502
     return jsonify({"columns": columns}), 200

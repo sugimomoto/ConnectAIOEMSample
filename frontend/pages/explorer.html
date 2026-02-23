@@ -22,27 +22,8 @@
     <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
       <div class="space-y-4">
 
-        <!-- コネクション -->
-        <div class="grid grid-cols-4 items-center gap-4">
-          <label class="text-sm font-medium text-gray-600 text-right">コネクション</label>
-          <div class="col-span-3">
-            <div x-show="connections.length === 0 && !error" class="text-sm text-gray-400 py-2">
-              コネクションがありません。先に<a href="/connections" class="text-blue-600 hover:underline">コネクションを作成</a>してください。
-            </div>
-            <select x-show="connections.length > 0"
-                    x-model="selectedConnectionId"
-                    @change="onConnectionChange()"
-                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">選択してください</option>
-              <template x-for="conn in connections" :key="conn.id">
-                <option :value="conn.id" x-text="conn.name"></option>
-              </template>
-            </select>
-          </div>
-        </div>
-
         <!-- カタログ -->
-        <div x-show="catalogs.length > 0" class="grid grid-cols-4 items-center gap-4">
+        <div class="grid grid-cols-4 items-center gap-4">
           <label class="text-sm font-medium text-gray-600 text-right">カタログ</label>
           <div class="col-span-3">
             <select x-model="selectedCatalog"
@@ -142,8 +123,6 @@
   <script>
     function explorerData() {
       return {
-        connections: [],
-        selectedConnectionId: '',
         catalogs: [],
         selectedCatalog: '',
         schemas: [],
@@ -155,33 +134,10 @@
         error: null,
 
         async init() {
-          try {
-            const client = new APIClient();
-            const data = await client.getConnections();
-            this.connections = data.connections;
-            if (this.connections.length > 0) {
-              this.selectedConnectionId = this.connections[0].id;
-              await this.onConnectionChange();
-            }
-          } catch (e) {
-            this.error = e.message;
-          }
-        },
-
-        async onConnectionChange() {
-          this.catalogs = [];
-          this.selectedCatalog = '';
-          this.schemas = [];
-          this.selectedSchema = '';
-          this.tables = [];
-          this.selectedTable = '';
-          this.columns = [];
-          this.error = null;
-          if (!this.selectedConnectionId) return;
           this.loading = true;
           try {
             const client = new APIClient();
-            const data = await client.getCatalogs(this.selectedConnectionId);
+            const data = await client.getCatalogs();
             this.catalogs = data.catalogs;
             if (this.catalogs.length > 0) {
               this.selectedCatalog = this.catalogs[0].TABLE_CATALOG;
@@ -205,7 +161,7 @@
           this.loading = true;
           try {
             const client = new APIClient();
-            const data = await client.getSchemas(this.selectedConnectionId, this.selectedCatalog);
+            const data = await client.getSchemas(this.selectedCatalog);
             this.schemas = data.schemas;
             if (this.schemas.length > 0) {
               this.selectedSchema = this.schemas[0].TABLE_SCHEMA;
@@ -227,7 +183,7 @@
           this.loading = true;
           try {
             const client = new APIClient();
-            const data = await client.getTables(this.selectedConnectionId, this.selectedCatalog, this.selectedSchema);
+            const data = await client.getTables(this.selectedCatalog, this.selectedSchema);
             this.tables = data.tables;
             if (this.tables.length > 0) {
               this.selectedTable = this.tables[0].TABLE_NAME;
@@ -248,7 +204,6 @@
           try {
             const client = new APIClient();
             const data = await client.getColumns(
-              this.selectedConnectionId,
               this.selectedCatalog,
               this.selectedSchema,
               this.selectedTable
