@@ -16,7 +16,6 @@
 
 ## 前提条件
 
-- **Python 3.11 以上**
 - **CData Connect AI** の親アカウント（以下が必要です）
   - **親アカウント ID**
   - アカウントに登録済みの **RSA 秘密鍵**（PEM 形式）
@@ -25,14 +24,67 @@
 
 ## セットアップ
 
-### 1. リポジトリをクローンする
+セットアップ方法は **DevContainer（推奨）** と **ローカル環境（手動）** の2種類があります。
+
+---
+
+### DevContainer / GitHub Codespaces（推奨）
+
+Python や依存パッケージのセットアップが不要で、すぐに開発を始められます。
+
+#### GitHub Codespaces で起動する
+
+1. リポジトリページで **Code → Codespaces → Create codespace on main** をクリック
+2. コンテナのビルドと自動セットアップが完了するまで待つ（初回は数分かかります）
+3. `backend/.env` を編集して必要な値を設定する（後述）
+4. **実行とデバッグ** パネルから **Flask: Run** を選択して **F5** を押す
+
+#### ローカルの VS Code DevContainer で起動する
+
+**前提条件：** Docker Desktop と VS Code の [Dev Containers 拡張機能](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) が必要です。
+
+1. リポジトリをクローンする
 
 ```bash
 git clone <リポジトリURL>
 cd ConnectAIOEMSample
 ```
 
-### 2. Python 仮想環境を作成する
+2. VS Code でフォルダを開き、通知バナーの **Reopen in Container** をクリック
+   （またはコマンドパレット `Ctrl+Shift+P` → **Dev Containers: Reopen in Container**）
+3. コンテナのビルドと自動セットアップが完了するまで待つ
+4. `backend/.env` を編集して必要な値を設定する（後述）
+5. **実行とデバッグ** パネルから **Flask: Run** を選択して **F5** を押す
+
+#### DevContainer 環境での環境変数設定
+
+コンテナ起動後、`backend/.env` に以下を設定します。
+
+```dotenv
+SECRET_KEY=ランダムな長い文字列に変更してください
+CONNECT_AI_PARENT_ACCOUNT_ID=あなたの親アカウントID
+
+# RSA 秘密鍵（ファイル配置が不要な環境変数方式を推奨）
+# 改行を \n でエスケープして1行で記載してください
+CONNECT_AI_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----"
+```
+
+> **Codespaces を使う場合の Tip:** リポジトリの **Settings → Secrets and variables → Codespaces** に `CONNECT_AI_PRIVATE_KEY` などを登録しておくと、`.env` を手動編集しなくても自動的に環境変数として利用できます。
+
+---
+
+### ローカル環境（手動セットアップ）
+
+**前提条件：** Python 3.11 以上
+
+#### 1. リポジトリをクローンする
+
+```bash
+git clone <リポジトリURL>
+cd ConnectAIOEMSample
+```
+
+#### 2. Python 仮想環境を作成する
 
 ```bash
 cd backend
@@ -41,13 +93,13 @@ source venv/bin/activate        # macOS / Linux
 # venv\Scripts\activate         # Windows
 ```
 
-### 3. 依存パッケージをインストールする
+#### 3. 依存パッケージをインストールする
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. RSA 秘密鍵を配置する
+#### 4. RSA 秘密鍵を配置する
 
 `backend/keys/` ディレクトリを作成し、Connect AI の RSA 秘密鍵をコピーします。
 
@@ -56,7 +108,7 @@ mkdir -p backend/keys
 cp /path/to/your/private.key backend/keys/private.key
 ```
 
-### 5. 環境変数を設定する
+#### 5. 環境変数を設定する
 
 サンプルファイルをコピーして値を設定します。
 
@@ -86,17 +138,17 @@ CONNECT_AI_PRIVATE_KEY_PATH=backend/keys/private.key
 APP_BASE_URL=http://localhost:5001
 ```
 
-### 6. データベースを初期化する
+#### 6. データベースを初期化する
 
 ```bash
-cd backend
-flask db upgrade
+cd ..  # プロジェクトルートに戻る
+python3 -m flask --app backend.app:create_app db upgrade
 ```
 
-### 7. アプリを起動する
+#### 7. アプリを起動する
 
 ```bash
-flask run --port 5001
+python3 -m flask --app backend.app:create_app run --port 5001
 ```
 
 ブラウザで **http://localhost:5001** を開くと、ダッシュボードへ自動的にリダイレクトされます。
@@ -130,15 +182,17 @@ pytest tests/
 
 ## VS Code でのデバッグ
 
-`.vscode/launch.json` にデバッグ構成が含まれています。
+`.vscode/launch.json` にデバッグ構成が含まれています。DevContainer / Codespaces・ローカル環境のどちらでも同じ手順で利用できます。
 
 | 構成名 | 説明 |
 |---|---|
-| **Flask Run (Debug)** | Flask サーバーをデバッガー付きで起動（ポート 5001） |
-| **pytest: All Tests** | テストスイート全体を実行 |
+| **Flask: Run** | Flask サーバーをデバッガー付きで起動（ポート 5001） |
+| **pytest: All** | テストスイート全体を実行 |
 | **pytest: Current File** | 現在開いているファイルのテストを実行 |
 
-**実行とデバッグ** パネル（`Cmd+Shift+D`）から構成を選択し、**F5** を押して開始します。
+**実行とデバッグ** パネル（`Ctrl+Shift+D` / `Cmd+Shift+D`）から構成を選択し、**F5** を押して開始します。
+
+> **Note:** デバッグ構成は VS Code で選択中の Python インタープリターを自動的に使用します。DevContainer 環境ではコンテナのシステム Python（`/usr/local/bin/python`）が、ローカル環境では `backend/venv` の Python が使われます。
 
 ---
 
@@ -146,6 +200,7 @@ pytest tests/
 
 ```
 ConnectAIOEMSample/
+├── .devcontainer/       # DevContainer / GitHub Codespaces 設定
 ├── backend/
 │   ├── api/v1/          # Flask ルートハンドラー（auth, connections, metadata, query, data）
 │   ├── connectai/       # CData Connect AI API クライアント

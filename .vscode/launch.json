@@ -15,7 +15,7 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       },
-      "python": "${workspaceFolder}/backend/venv/bin/python",
+      "python": "${command:python.interpreterPath}",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
     },
@@ -31,7 +31,7 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       },
-      "python": "${workspaceFolder}/backend/venv/bin/python",
+      "python": "${command:python.interpreterPath}",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
     },
@@ -47,7 +47,7 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}"
       },
-      "python": "${workspaceFolder}/backend/venv/bin/python",
+      "python": "${command:python.interpreterPath}",
       "cwd": "${workspaceFolder}",
       "justMyCode": false
     }
