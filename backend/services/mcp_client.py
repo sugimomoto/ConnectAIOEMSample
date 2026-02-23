@@ -1,3 +1,4 @@
+import json
 import uuid
 import requests
 
@@ -8,6 +9,28 @@ _cached_tools: list[dict] | None = None
 
 class MCPError(Exception):
     """MCP サーバーとの通信エラー"""
+
+
+def _parse_response(resp: requests.Response) -> dict:
+    """
+    MCP サーバーのレスポンスを解析して JSON-RPC ボディを返す。
+
+    MCP Streamable HTTP は Content-Type に応じて2種類のフォーマットで返す:
+    - application/json: 通常の JSON レスポンス
+    - text/event-stream: SSE フォーマット (event: message\\ndata: {...}\\n\\n)
+    """
+    content_type = resp.headers.get("Content-Type", "")
+
+    if "text/event-stream" in content_type:
+        # SSE フォーマット: "data: <json>" 行を探して JSON をパース
+        for line in resp.text.splitlines():
+            if line.startswith("data:"):
+                data_str = line[len("data:"):].strip()
+                if data_str:
+                    return json.loads(data_str)
+        raise MCPError(f"SSE response contains no data line: {resp.text[:500]!r}")
+
+    return resp.json()
 
 
 class MCPClient:
@@ -24,6 +47,7 @@ class MCPClient:
         return {
             "Authorization": f"Bearer {self.jwt_token}",
             "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
         }
 
     def _call_jsonrpc(self, method: str, params: dict) -> dict:
@@ -55,10 +79,12 @@ class MCPClient:
             raise MCPError(f"Request failed: {e}") from e
 
         try:
-            body = resp.json()
+            body = _parse_response(resp)
+        except MCPError:
+            raise
         except Exception as e:
             raise MCPError(
-                f"Invalid JSON response: {resp.text[:500]!r}"
+                f"Invalid response: {resp.text[:500]!r}"
             ) from e
 
         if "error" in body:

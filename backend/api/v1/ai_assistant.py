@@ -1,4 +1,5 @@
-from flask import render_template, request, jsonify, session, current_app
+import json
+from flask import render_template, request, Response, stream_with_context, jsonify, current_app
 from flask_login import login_required, current_user
 from backend.api.v1 import api_v1_bp
 from backend.services import crypto_service
@@ -21,7 +22,8 @@ def ai_assistant_page():
 def ai_assistant_chat():
     data = request.get_json() or {}
     message = data.get("message", "").strip()
-    catalog_name = data.get("catalog_name", "").strip() or None
+    catalog_name = (data.get("catalog_name") or "").strip() or None
+    client_messages: list[dict] = data.get("messages") or []
 
     if not message:
         return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "メッセージを入力してください"}}), 400
@@ -48,22 +50,17 @@ def ai_assistant_chat():
     parent_id = current_app.config["CONNECT_AI_PARENT_ACCOUNT_ID"]
     jwt_token = generate_connect_ai_jwt(parent_id, account_id)
 
-    history: list[dict] = session.get("chat_history", [])
-    history.append({"role": "user", "content": message})
+    # クライアント側の履歴 + 新しいメッセージを結合
+    messages = list(client_messages) + [{"role": "user", "content": message}]
 
-    try:
-        answer, tool_calls = claude_service.chat(api_key, jwt_token, history, catalog_name)
-    except Exception as e:
-        return jsonify({"error": {"code": "CLAUDE_ERROR", "message": str(e)}}), 500
+    def generate():
+        for event_type, event_data in claude_service.stream_chat(api_key, jwt_token, messages, catalog_name):
+            yield f"event: {event_type}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
 
-    history.append({"role": "assistant", "content": answer})
-    session["chat_history"] = history
-
-    return jsonify({"answer": answer, "tool_calls": tool_calls}), 200
+    return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
 @api_v1_bp.route("/api/v1/ai-assistant/reset", methods=["POST"])
 @login_required
 def ai_assistant_reset():
-    session.pop("chat_history", None)
     return jsonify({"message": "会話をリセットしました"}), 200

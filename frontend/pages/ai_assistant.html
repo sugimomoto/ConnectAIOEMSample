@@ -101,17 +101,17 @@
                   </div>
                 </template>
 
-                <!-- 回答テキスト -->
+                <!-- 回答テキスト（ストリーミング中はカーソル表示） -->
                 <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 shadow-sm whitespace-pre-wrap"
-                     x-text="msg.content"></div>
+                     x-text="msg.content + (loading && idx === messages.length - 1 && msg.role === 'assistant' ? '▌' : '')"></div>
               </div>
             </div>
           </template>
         </div>
       </template>
 
-      <!-- 送信中インジケーター -->
-      <template x-if="loading">
+      <!-- ツール実行中インジケーター（アシスタントメッセージがまだない場合） -->
+      <template x-if="loading && (messages.length === 0 || messages[messages.length - 1].role === 'user')">
         <div class="flex justify-start">
           <div class="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3.5 shadow-sm">
             <div class="flex items-center gap-1.5">
@@ -191,6 +191,9 @@
           const msg = this.inputMessage.trim();
           if (!msg || this.loading || !this.hasApiKey) return;
 
+          // 送信前の会話履歴（テキストのみ）をキャプチャ
+          const historyToSend = this.messages.map(m => ({ role: m.role, content: m.content }));
+
           this.messages.push({ role: 'user', content: msg });
           this.inputMessage = '';
           this.errorMessage = '';
@@ -198,17 +201,73 @@
           this.$nextTick(() => this.scrollToBottom());
 
           try {
-            const client = new APIClient();
-            const data = await client.chatWithAI(msg, this.selectedCatalog || null);
-            this.messages.push({
-              role: 'assistant',
-              content: data.answer,
-              tool_calls: data.tool_calls || [],
-              showTools: false,
+            const resp = await fetch('/api/v1/ai-assistant/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: msg,
+                catalog_name: this.selectedCatalog || null,
+                messages: historyToSend,
+              }),
             });
+
+            if (!resp.ok) {
+              // バリデーションエラー等（JSON レスポンス）
+              this.messages.pop();
+              const errData = await resp.json();
+              this.errorMessage = errData.error?.message || 'エラーが発生しました';
+              return;
+            }
+
+            // ストリーミング用アシスタントメッセージを追加
+            this.messages.push({ role: 'assistant', content: '', tool_calls: [], showTools: false });
+            this.$nextTick(() => this.scrollToBottom());
+
+            // SSE ストリームを読み込む
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+
+              // SSE イベント（\n\n 区切り）をバッファから解析
+              const parts = buffer.split('\n\n');
+              buffer = parts.pop(); // 末尾の不完全チャンクを保持
+
+              for (const part of parts) {
+                if (!part.trim()) continue;
+                let eventType = '';
+                let dataStr = '';
+                for (const line of part.split('\n')) {
+                  if (line.startsWith('event: ')) eventType = line.slice(7);
+                  else if (line.startsWith('data: ')) dataStr = line.slice(6);
+                }
+                if (!eventType || !dataStr) continue;
+
+                const data = JSON.parse(dataStr);
+                const lastMsg = this.messages[this.messages.length - 1];
+
+                if (eventType === 'text_delta') {
+                  lastMsg.content += data.text;
+                  this.$nextTick(() => this.scrollToBottom());
+                } else if (eventType === 'tool_start') {
+                  lastMsg.tool_calls.push({ name: data.tool_name, input: data.tool_input });
+                } else if (eventType === 'error') {
+                  this.errorMessage = data.error;
+                }
+                // 'done' イベントは特別な処理不要（ストリーム終了はループで検出）
+              }
+            }
           } catch (e) {
-            // ユーザーメッセージをロールバック
-            this.messages.pop();
+            // ネットワークエラー等：空のアシスタントメッセージがあれば削除
+            const last = this.messages[this.messages.length - 1];
+            if (last?.role === 'assistant' && !last.content) {
+              this.messages.pop();
+            }
+            this.messages.pop(); // ユーザーメッセージを削除
             this.errorMessage = e.message;
           } finally {
             this.loading = false;
@@ -216,9 +275,7 @@
           }
         },
 
-        async resetConversation() {
-          const client = new APIClient();
-          try { await client.resetChat(); } catch (e) { /* ignore */ }
+        resetConversation() {
           this.messages = [];
           this.errorMessage = '';
         },

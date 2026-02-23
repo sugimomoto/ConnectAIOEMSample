@@ -1,3 +1,6 @@
+import json
+from typing import Generator
+
 from anthropic import Anthropic
 from backend.services.mcp_client import MCPClient, MCPError, get_mcp_tools
 
@@ -107,3 +110,88 @@ def chat(
         break
 
     return "", tool_calls_log
+
+
+def stream_chat(
+    api_key: str,
+    jwt_token: str,
+    messages: list[dict],
+    catalog_name: str | None = None,
+) -> Generator[tuple[str, dict], None, None]:
+    """
+    Agentic ループをストリーミングで実行し、SSE イベントを (event_type, data) として yield する。
+
+    Yields:
+        ("text_delta",  {"text": "..."})
+        ("tool_start",  {"tool_name": "...", "tool_input": {...}})
+        ("tool_result", {"tool_name": "...", "result": "..."})
+        ("done",        {"message": "complete", "answer": "..."})
+        ("error",       {"error": "..."})  ← 例外発生時
+    """
+    client = Anthropic(api_key=api_key)
+    mcp = MCPClient(jwt_token)
+    tools = get_mcp_tools(jwt_token)
+
+    system = _SYSTEM_PROMPT
+    if catalog_name:
+        system += f"\n優先して使用するカタログ名は '{catalog_name}' です。"
+
+    current_messages: list[dict] = [
+        {"role": m["role"], "content": m["content"]} for m in messages
+    ]
+    full_answer_parts: list[str] = []
+
+    try:
+        for _ in range(_MAX_ITERATIONS):
+            with client.messages.stream(
+                model="claude-opus-4-6",
+                max_tokens=4096,
+                system=system,
+                messages=current_messages,
+                tools=tools,
+            ) as stream:
+                for text in stream.text_stream:
+                    yield "text_delta", {"text": text}
+                    full_answer_parts.append(text)
+
+                final_message = stream.get_final_message()
+
+            if final_message.stop_reason == "end_turn":
+                break
+
+            if final_message.stop_reason == "tool_use":
+                current_messages.append({
+                    "role": "assistant",
+                    "content": [_block_to_dict(b) for b in final_message.content],
+                })
+
+                tool_results = []
+                for block in final_message.content:
+                    if block.type != "tool_use":
+                        continue
+                    yield "tool_start", {
+                        "tool_name": block.name,
+                        "tool_input": dict(block.input),
+                    }
+                    try:
+                        result = mcp.call_tool(block.name, block.input)
+                    except MCPError as e:
+                        result = f"エラー: {e}"
+
+                    yield "tool_result", {"tool_name": block.name, "result": result}
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result,
+                    })
+
+                current_messages.append({"role": "user", "content": tool_results})
+                continue
+
+            break
+
+    except Exception as e:
+        yield "error", {"error": str(e)}
+        return
+
+    yield "done", {"message": "complete", "answer": "".join(full_answer_parts)}

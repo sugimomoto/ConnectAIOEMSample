@@ -6,7 +6,7 @@ Claude サービスのテスト
 """
 import pytest
 from unittest.mock import patch, MagicMock
-from backend.services.claude_service import chat, _block_to_dict
+from backend.services.claude_service import chat, stream_chat, _block_to_dict
 
 
 # ---------------------------------------------------------------------------
@@ -312,3 +312,144 @@ class TestChatHistory:
         assert messages[0]["content"] == "最初の質問"
         assert messages[1]["content"] == "最初の回答"
         assert messages[2]["content"] == "2回目の質問"
+
+
+# ---------------------------------------------------------------------------
+# stream_chat() — ストリーミング
+# ---------------------------------------------------------------------------
+
+class _MockStream:
+    """client.messages.stream() のコンテキストマネージャーモック。"""
+
+    def __init__(self, text_chunks: list, stop_reason: str = "end_turn", content: list = None):
+        self.text_stream = iter(text_chunks)
+        self._final_message = _Response(stop_reason, content or [])
+
+    def get_final_message(self):
+        return self._final_message
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+
+class TestStreamChat:
+    def test_yields_text_delta_events(self):
+        mock_stream = _MockStream(["Hello", " World"], "end_turn")
+
+        with patch("backend.services.claude_service.Anthropic") as MockAnthropic, \
+             patch("backend.services.claude_service.get_mcp_tools", return_value=SAMPLE_TOOLS), \
+             patch("backend.services.claude_service.MCPClient"):
+
+            mock_client = MagicMock()
+            MockAnthropic.return_value = mock_client
+            mock_client.messages.stream.return_value = mock_stream
+
+            events = list(stream_chat(SAMPLE_API_KEY, SAMPLE_JWT, [{"role": "user", "content": "test"}]))
+
+        text_events = [(et, d) for et, d in events if et == "text_delta"]
+        assert len(text_events) == 2
+        assert text_events[0][1]["text"] == "Hello"
+        assert text_events[1][1]["text"] == " World"
+
+    def test_yields_done_event_with_full_answer(self):
+        mock_stream = _MockStream(["回答テキスト"], "end_turn")
+
+        with patch("backend.services.claude_service.Anthropic") as MockAnthropic, \
+             patch("backend.services.claude_service.get_mcp_tools", return_value=SAMPLE_TOOLS), \
+             patch("backend.services.claude_service.MCPClient"):
+
+            mock_client = MagicMock()
+            MockAnthropic.return_value = mock_client
+            mock_client.messages.stream.return_value = mock_stream
+
+            events = list(stream_chat(SAMPLE_API_KEY, SAMPLE_JWT, [{"role": "user", "content": "test"}]))
+
+        done_events = [(et, d) for et, d in events if et == "done"]
+        assert len(done_events) == 1
+        assert done_events[0][1]["answer"] == "回答テキスト"
+        assert done_events[0][1]["message"] == "complete"
+
+    def test_yields_tool_start_and_tool_result_events(self):
+        tool_stream = _MockStream(
+            [],
+            "tool_use",
+            [
+                _TextBlock("考え中"),
+                _ToolUseBlock("tu_001", "getCatalogs", {}),
+            ],
+        )
+        final_stream = _MockStream(["カタログ一覧: cat1"], "end_turn")
+
+        with patch("backend.services.claude_service.Anthropic") as MockAnthropic, \
+             patch("backend.services.claude_service.get_mcp_tools", return_value=SAMPLE_TOOLS), \
+             patch("backend.services.claude_service.MCPClient") as MockMCPClient:
+
+            mock_client = MagicMock()
+            MockAnthropic.return_value = mock_client
+            mock_client.messages.stream.side_effect = [tool_stream, final_stream]
+
+            mock_mcp = MagicMock()
+            MockMCPClient.return_value = mock_mcp
+            mock_mcp.call_tool.return_value = "cat1,cat2"
+
+            events = list(stream_chat(SAMPLE_API_KEY, SAMPLE_JWT, [{"role": "user", "content": "test"}]))
+
+        event_types = [et for et, _ in events]
+        assert "tool_start" in event_types
+        assert "tool_result" in event_types
+        assert "text_delta" in event_types
+        assert "done" in event_types
+
+        tool_start = next(d for et, d in events if et == "tool_start")
+        assert tool_start["tool_name"] == "getCatalogs"
+        assert tool_start["tool_input"] == {}
+
+        tool_result = next(d for et, d in events if et == "tool_result")
+        assert tool_result["tool_name"] == "getCatalogs"
+        assert tool_result["result"] == "cat1,cat2"
+
+    def test_yields_error_event_on_exception(self):
+        with patch("backend.services.claude_service.Anthropic") as MockAnthropic, \
+             patch("backend.services.claude_service.get_mcp_tools", return_value=SAMPLE_TOOLS), \
+             patch("backend.services.claude_service.MCPClient"):
+
+            mock_client = MagicMock()
+            MockAnthropic.return_value = mock_client
+            mock_client.messages.stream.side_effect = Exception("API error")
+
+            events = list(stream_chat(SAMPLE_API_KEY, SAMPLE_JWT, [{"role": "user", "content": "test"}]))
+
+        assert len(events) == 1
+        assert events[0][0] == "error"
+        assert "API error" in events[0][1]["error"]
+
+    def test_mcp_error_in_tool_use_yields_error_result(self):
+        from backend.services.mcp_client import MCPError
+
+        tool_stream = _MockStream(
+            [],
+            "tool_use",
+            [_ToolUseBlock("tu_002", "getCatalogs", {})],
+        )
+        final_stream = _MockStream(["エラー後の回答"], "end_turn")
+
+        with patch("backend.services.claude_service.Anthropic") as MockAnthropic, \
+             patch("backend.services.claude_service.get_mcp_tools", return_value=SAMPLE_TOOLS), \
+             patch("backend.services.claude_service.MCPClient") as MockMCPClient:
+
+            mock_client = MagicMock()
+            MockAnthropic.return_value = mock_client
+            mock_client.messages.stream.side_effect = [tool_stream, final_stream]
+
+            mock_mcp = MagicMock()
+            MockMCPClient.return_value = mock_mcp
+            mock_mcp.call_tool.side_effect = MCPError("Connection refused")
+
+            events = list(stream_chat(SAMPLE_API_KEY, SAMPLE_JWT, [{"role": "user", "content": "test"}]))
+
+        tool_result = next(d for et, d in events if et == "tool_result")
+        assert "エラー" in tool_result["result"]
+        assert "Connection refused" in tool_result["result"]
