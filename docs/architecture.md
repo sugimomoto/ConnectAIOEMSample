@@ -492,7 +492,7 @@ pytest-cov==4.1.0
 | MCP 認証 | OAuth JWT Bearer Token のみサポート。既存の Connect AI JWT を使用 |
 | Claude API Key | アプリ共有キーは使用しない。ユーザー個別のキーが必須 |
 | ストリーミング | SSE（Server-Sent Events）で Flask → ブラウザへリアルタイム送信 |
-| 会話履歴 | Flask セッションで保持。DB への永続化は行わない |
+| 会話履歴 | クライアントサイド（Alpine.js の `messages` 配列）で管理。サーバーはステートレス。DB への永続化は行わない |
 
 ### 6.7 データソースの`name`について
 

@@ -418,12 +418,19 @@ erDiagram
 
 **責務**: Claude API 呼び出しと MCP Agentic loop の実行
 
-- `chat(user_message, messages, claude_api_key, jwt_token, catalog_name=None)` → generator
+- `chat(api_key, jwt_token, messages, catalog_name=None)` → tuple[str, list]
   - ユーザーの Claude API Key で Anthropic SDK を初期化
   - MCP ツール定義を `tools` パラメータとして渡す
-  - Claude がツール呼び出しを返した場合、`mcp_client` を呼び出して結果を返す（Agentic loop）
-  - SSE 形式で最終回答をストリーミング yield する
-  - ツール呼び出し情報（名前・引数・結果サマリー）も SSE イベントとして yield する
+  - Claude がツール呼び出しを返した場合、`MCPClient` を呼び出して結果を返す（Agentic loop、最大10回）
+  - 最終テキスト回答とツール呼び出しログのタプルを返す（非ストリーミング版）
+
+- `stream_chat(api_key, jwt_token, messages, catalog_name=None)` → Generator
+  - `client.messages.stream()` でストリーミングリクエスト
+  - `(event_type, data_dict)` タプルを yield するジェネレーター
+  - `text_delta`: テキストトークン受信時
+  - `tool_start` / `tool_result`: ツール呼び出し前後
+  - `done`: 全ストリーミング完了時（完全な回答テキストを含む）
+  - `error`: 例外発生時
 
 #### 4.1.10 Connect AI HTTP APIクライアント (connectai/client.py)
 
@@ -650,19 +657,40 @@ graph TD
 | メソッド | エンドポイント | 説明 | リクエスト | レスポンス |
 |---------|--------------|------|----------|----------|
 | GET | `/ai-assistant` | チャット画面レンダリング | - | HTML |
-| POST | `/api/v1/ai-assistant/chat` | チャットメッセージ送信（SSE） | `{message, catalog_name?}` | `text/event-stream` |
-| POST | `/api/v1/ai-assistant/reset` | 会話リセット | - | `{message}` |
+| POST | `/api/v1/ai-assistant/chat` | チャットメッセージ送信（SSE） | `{message, catalog_name?, messages?}` | `text/event-stream` |
+| POST | `/api/v1/ai-assistant/reset` | 会話リセット（クライアント通知用） | - | `{message}` |
+
+**リクエストボディ:**
+```json
+{
+  "message": "ユーザーの質問文",
+  "catalog_name": "SalesDB",
+  "messages": [
+    {"role": "user", "content": "前の質問"},
+    {"role": "assistant", "content": "前の回答"}
+  ]
+}
+```
+
+> **注**: 会話履歴 (`messages`) はクライアントサイド（Alpine.js の `messages` 配列）で管理し、
+> リクエストごとに送信します。サーバーはステートレスです。
 
 **SSE イベント形式:**
 ```
-event: text
-data: {"chunk": "回答テキストの断片..."}
+event: text_delta
+data: {"text": "回答テキストの断片..."}
 
-event: tool_call
-data: {"name": "getTables", "input": {...}, "summary": "..."}
+event: tool_start
+data: {"tool_name": "getTables", "tool_input": {...}}
+
+event: tool_result
+data: {"tool_name": "getTables", "result": "..."}
 
 event: done
-data: {}
+data: {"message": "complete", "answer": "全回答テキスト"}
+
+event: error
+data: {"error": "エラーメッセージ"}
 ```
 
 ### 6.2 クエリ実行 API 詳細
