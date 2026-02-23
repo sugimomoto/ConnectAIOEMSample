@@ -14,7 +14,7 @@
         "ms-python.debugpy"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "/usr/local/bin/python3.11",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": ["backend/tests"],
         "python.testing.cwd": "${workspaceFolder}"
