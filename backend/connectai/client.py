@@ -1,7 +1,42 @@
+import json
+import threading
+import time
+
 import requests
 from flask import current_app
+from flask_login import current_user
 from .jwt import generate_connect_ai_jwt
 from .exceptions import ConnectAIError
+
+
+def _save_log_async(app, user_id: int, method: str, endpoint: str,
+                    request_body, response_body, status_code: int, elapsed_ms: int) -> None:
+    """API ログを DB にバックグラウンドで保存する（メイン処理をブロックしない）"""
+    def _save():
+        with app.app_context():
+            try:
+                from backend.models.api_log import ApiLog
+                from backend.models import db
+                log = ApiLog(
+                    user_id=user_id,
+                    method=method,
+                    endpoint=endpoint,
+                    request_body=(
+                        json.dumps(request_body, ensure_ascii=False)
+                        if request_body is not None else None
+                    ),
+                    response_body=(
+                        json.dumps(response_body, ensure_ascii=False)
+                        if response_body is not None else None
+                    ),
+                    status_code=status_code,
+                    elapsed_ms=elapsed_ms,
+                )
+                db.session.add(log)
+                db.session.commit()
+            except Exception:
+                pass  # ログ失敗はサイレントに無視
+    threading.Thread(target=_save, daemon=True).start()
 
 
 class ConnectAIClient:
@@ -20,13 +55,39 @@ class ConnectAIClient:
         token = generate_connect_ai_jwt(self.parent_account_id, self.subject_id)
         return {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
+    def _log(self, path: str, method: str, request_body, response_body,
+             status_code: int, start: float) -> None:
+        """API 呼び出し結果をバックグラウンドスレッドで DB に記録する。未認証時はスキップ。"""
+        try:
+            if not current_user.is_authenticated:
+                return
+            user_id = current_user.id
+            app = current_app._get_current_object()
+            elapsed_ms = int((time.monotonic() - start) * 1000)
+            _save_log_async(
+                app=app,
+                user_id=user_id,
+                method=method,
+                endpoint=path,
+                request_body=request_body,
+                response_body=response_body,
+                status_code=status_code,
+                elapsed_ms=elapsed_ms,
+            )
+        except Exception:
+            pass  # ログ処理のエラーは本体に伝播させない
+
     def _get(self, path: str, params: dict | None = None) -> dict:
         url = f"{self.base_url}{path}"
+        start = time.monotonic()
         try:
             resp = requests.get(url, headers=self._headers(), params=params, timeout=30)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            self._log(path, "GET", None, data, resp.status_code, start)
+            return data
         except requests.HTTPError as e:
+            self._log(path, "GET", None, {"error": e.response.text}, e.response.status_code, start)
             raise ConnectAIError(f"HTTP {e.response.status_code}: {e.response.text}") from e
         except requests.exceptions.JSONDecodeError as e:
             raise ConnectAIError(f"Invalid JSON (HTTP {resp.status_code}): {resp.text[:500]!r}") from e
@@ -41,22 +102,28 @@ class ConnectAIClient:
 
     def _delete(self, path: str) -> None:
         url = f"{self.base_url}{path}"
+        start = time.monotonic()
         try:
             resp = requests.delete(url, headers=self._headers(), timeout=30)
             resp.raise_for_status()
+            self._log(path, "DELETE", None, None, resp.status_code, start)
         except requests.HTTPError as e:
+            self._log(path, "DELETE", None, {"error": e.response.text}, e.response.status_code, start)
             raise ConnectAIError(f"HTTP {e.response.status_code}: {e.response.text}") from e
         except requests.RequestException as e:
             raise ConnectAIError(f"Request failed: {e}") from e
 
     def _post(self, path: str, payload: dict) -> dict:
-        import json
         url = f"{self.base_url}{path}"
+        start = time.monotonic()
         try:
             resp = requests.post(url, json=payload, headers=self._headers(), timeout=30)
             resp.raise_for_status()
-            return resp.json()
+            data = resp.json()
+            self._log(path, "POST", payload, data, resp.status_code, start)
+            return data
         except requests.HTTPError as e:
+            self._log(path, "POST", payload, {"error": e.response.text}, e.response.status_code, start)
             raise ConnectAIError(
                 f"HTTP {e.response.status_code}: {e.response.text} "
                 f"| Request: POST {path} | Payload: {json.dumps(payload, ensure_ascii=False)}"
@@ -159,7 +226,6 @@ class ConnectAIClient:
         Returns:
             (["Id", "Name", ...], [["001", "John"], ...])
         """
-        import json
         payload: dict = {"query": sql}
         if params:
             formatted: dict = {}

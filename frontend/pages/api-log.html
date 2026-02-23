@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API ログ - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/header.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen"
+  x-data="apiLogApp()"
+  x-init="init()">
+
+  <!-- ヘッダー -->
+  <div id="app-header"></div>
+  <script>renderAppHeader('api-log');</script>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-6xl mx-auto px-6 py-8">
+
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">API ログ</h2>
+      <button @click="clearLogs()"
+              class="text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition-colors">
+        ログをクリア
+      </button>
+    </div>
+
+    <!-- エラー表示 -->
+    <div x-show="error" x-cloak
+         class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"
+         x-text="error"></div>
+
+    <!-- ログ一覧テーブル -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <p class="text-sm text-gray-500">
+          <template x-if="total > 0">
+            <span x-text="`${offset + 1}〜${Math.min(offset + limit, total)} 件目 / 全 ${total} 件`"></span>
+          </template>
+          <template x-if="total === 0 && !loading">
+            <span>ログはありません</span>
+          </template>
+        </p>
+        <div x-show="loading" class="flex items-center gap-2 text-sm text-gray-400">
+          <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          読み込み中...
+        </div>
+      </div>
+
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">タイムスタンプ</th>
+            <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-20">メソッド</th>
+            <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">エンドポイント</th>
+            <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-24">ステータス</th>
+            <th class="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-24">処理時間</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          <template x-for="log in logs" :key="log.id">
+            <tr class="hover:bg-gray-50 cursor-pointer transition-colors"
+                @click="openDetail(log)">
+              <td class="px-6 py-3 text-gray-600 font-mono text-xs whitespace-nowrap"
+                  x-text="formatTimestamp(log.timestamp)"></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold font-mono"
+                      :class="methodColor(log.method)"
+                      x-text="log.method"></span>
+              </td>
+              <td class="px-4 py-3 text-gray-700 font-mono text-xs" x-text="log.endpoint"></td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                      :class="statusColor(log.status_code)"
+                      x-text="log.status_code"></span>
+              </td>
+              <td class="px-6 py-3 text-right text-gray-500 font-mono text-xs"
+                  x-text="`${log.elapsed_ms} ms`"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+
+      <!-- 空状態 -->
+      <div x-show="!loading && logs.length === 0" x-cloak
+           class="px-6 py-12 text-center text-gray-400 text-sm">
+        ログがありません。各画面を操作すると Connect AI API のログがここに記録されます。
+      </div>
+
+      <!-- ページネーション -->
+      <div x-show="total > limit" x-cloak
+           class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <button @click="prevPage()" :disabled="offset === 0"
+                class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ← 前へ
+        </button>
+        <span class="text-sm text-gray-500"
+              x-text="`${currentPage} / ${totalPages} ページ`"></span>
+        <button @click="nextPage()" :disabled="offset + limit >= total"
+                class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          次へ →
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- 詳細モーダル -->
+  <div x-show="selectedLog" x-cloak
+       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+       @click.self="closeDetail()">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+
+      <!-- モーダルヘッダー -->
+      <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold font-mono"
+                :class="methodColor(selectedLog?.method)"
+                x-text="selectedLog?.method"></span>
+          <span class="font-mono text-sm text-gray-700" x-text="selectedLog?.endpoint"></span>
+          <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
+                :class="statusColor(selectedLog?.status_code)"
+                x-text="selectedLog?.status_code"></span>
+          <span class="text-xs text-gray-400 font-mono" x-text="`${selectedLog?.elapsed_ms} ms`"></span>
+        </div>
+        <button @click="closeDetail()"
+                class="text-gray-400 hover:text-gray-600 transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- タイムスタンプ -->
+      <div class="px-6 py-2 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+        <span class="text-xs text-gray-400 font-mono" x-text="formatTimestamp(selectedLog?.timestamp)"></span>
+      </div>
+
+      <!-- リクエスト / レスポンス 2ペイン -->
+      <div class="flex flex-1 overflow-hidden divide-x divide-gray-200">
+        <!-- リクエスト -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">リクエストボディ</span>
+          </div>
+          <div class="flex-1 overflow-auto p-4">
+            <template x-if="selectedLog?.request_body">
+              <pre class="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all"
+                   x-text="prettyJson(selectedLog?.request_body)"></pre>
+            </template>
+            <template x-if="!selectedLog?.request_body">
+              <span class="text-xs text-gray-400 italic">なし（GET / DELETE リクエスト）</span>
+            </template>
+          </div>
+        </div>
+        <!-- レスポンス -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+          <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">レスポンスボディ</span>
+          </div>
+          <div class="flex-1 overflow-auto p-4">
+            <template x-if="selectedLog?.response_body">
+              <pre class="text-xs text-gray-700 font-mono whitespace-pre-wrap break-all"
+                   x-text="prettyJson(selectedLog?.response_body)"></pre>
+            </template>
+            <template x-if="!selectedLog?.response_body">
+              <span class="text-xs text-gray-400 italic">なし</span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script>
+    const client = new APIClient();
+
+    function apiLogApp() {
+      return {
+        logs: [],
+        total: 0,
+        limit: 50,
+        offset: 0,
+        selectedLog: null,
+        loading: false,
+        error: null,
+
+        async init() {
+          await this.fetchLogs();
+        },
+
+        async fetchLogs() {
+          this.loading = true;
+          this.error = null;
+          try {
+            const data = await client.getApiLogs(this.limit, this.offset);
+            this.logs = data.logs;
+            this.total = data.total;
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async prevPage() {
+          if (this.offset === 0) return;
+          this.offset = Math.max(0, this.offset - this.limit);
+          await this.fetchLogs();
+        },
+
+        async nextPage() {
+          if (this.offset + this.limit >= this.total) return;
+          this.offset += this.limit;
+          await this.fetchLogs();
+        },
+
+        openDetail(log) {
+          this.selectedLog = log;
+        },
+
+        closeDetail() {
+          this.selectedLog = null;
+        },
+
+        async clearLogs() {
+          if (!confirm('すべてのログを削除しますか？')) return;
+          try {
+            await client.clearApiLogs();
+            this.offset = 0;
+            await this.fetchLogs();
+          } catch (e) {
+            this.error = e.message;
+          }
+        },
+
+        get totalPages() {
+          return Math.max(1, Math.ceil(this.total / this.limit));
+        },
+
+        get currentPage() {
+          return Math.floor(this.offset / this.limit) + 1;
+        },
+
+        formatTimestamp(ts) {
+          if (!ts) return '';
+          return new Date(ts).toLocaleString('ja-JP', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          });
+        },
+
+        methodColor(method) {
+          const colors = {
+            'GET':    'bg-blue-100 text-blue-700',
+            'POST':   'bg-green-100 text-green-700',
+            'PUT':    'bg-yellow-100 text-yellow-700',
+            'DELETE': 'bg-red-100 text-red-700',
+          };
+          return colors[method] || 'bg-gray-100 text-gray-600';
+        },
+
+        statusColor(code) {
+          if (!code) return 'bg-gray-100 text-gray-600';
+          if (code >= 200 && code < 300) return 'bg-green-100 text-green-700';
+          if (code >= 400 && code < 500) return 'bg-yellow-100 text-yellow-700';
+          if (code >= 500) return 'bg-red-100 text-red-700';
+          return 'bg-gray-100 text-gray-600';
+        },
+
+        prettyJson(str) {
+          try {
+            return JSON.stringify(JSON.parse(str), null, 2);
+          } catch {
+            return str || '';
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>

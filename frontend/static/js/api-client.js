@@ -99,4 +99,12 @@ class APIClient {
       conditions,
     });
   }
+
+  async getApiLogs(limit = 50, offset = 0) {
+    return this.request('GET', `/api-logs?limit=${limit}&offset=${offset}`);
+  }
+
+  async clearApiLogs() {
+    return this.request('DELETE', '/api-logs');
+  }
 }
