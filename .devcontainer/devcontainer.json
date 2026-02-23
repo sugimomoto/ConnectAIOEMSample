@@ -2,7 +2,8 @@
   "name": "ConnectAIOEMSample",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "forwardPorts": [5001],
   "postCreateCommand": "bash .devcontainer/setup.sh",
