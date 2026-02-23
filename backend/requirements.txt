@@ -1,0 +1,24 @@
+# Webフレームワーク
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.5
+Flask-Login==0.6.3
+
+# データバリデーション
+pydantic==2.5.0
+email-validator==2.1.0
+
+# 認証・暗号化
+bcrypt==4.1.2
+PyJWT==2.8.0
+cryptography==41.0.7
+
+# HTTPクライアント（Connect AI API呼び出し用）
+requests==2.31.0
+
+# 環境変数
+python-dotenv==1.0.0
+
+# テスト
+pytest==7.4.3
+pytest-cov==4.1.0

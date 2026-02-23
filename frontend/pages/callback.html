@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>接続完了 - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center"
+      x-data="{
+        countdown: 3,
+        init() {
+          const timer = setInterval(() => {
+            this.countdown--;
+            if (this.countdown <= 0) {
+              clearInterval(timer);
+              window.location.href = '/connections';
+            }
+          }, 1000);
+        }
+      }">
+
+  <div class="text-center">
+    <!-- 成功アイコン -->
+    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+      <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+      </svg>
+    </div>
+
+    <h1 class="text-2xl font-bold text-gray-800 mb-2">接続が完了しました</h1>
+    <p class="text-gray-500 text-sm mb-6">
+      コネクションが正常に作成されました。
+    </p>
+
+    <p class="text-gray-400 text-sm mb-4">
+      <span x-text="countdown"></span> 秒後にコネクション一覧へ移動します...
+    </p>
+
+    <a href="/connections"
+       class="inline-block bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-6 py-2 rounded-lg transition-colors">
+      今すぐコネクション一覧へ
+    </a>
+  </div>
+
+</body>
+</html>

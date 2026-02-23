@@ -1,0 +1,35 @@
+# 秘密情報
+.env
+backend/keys/private.key
+backend/keys/public.key
+backend/keys/parent_account_id.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# データベース
+*.db
+*.sqlite3
+instance/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Claude Code
+.claude/settings.local.json
+
+# テスト
+.pytest_cache/
+
+# Alembic
+backend/migrations/versions/*.pyc

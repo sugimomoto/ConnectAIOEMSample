@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>コネクション作成 - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen"
+      x-data="{
+        datasources: [],
+        name: '',
+        dataSource: '',
+        loading: true,
+        submitting: false,
+        error: null,
+        async init() {
+          try {
+            const client = new APIClient();
+            const data = await client.getDatasources();
+            this.datasources = data.datasources;
+            if (this.datasources.length > 0) {
+              this.dataSource = this.datasources[0].dataSource;
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+        async submit() {
+          if (!this.name.trim() || !this.dataSource) return;
+          this.submitting = true;
+          this.error = null;
+          try {
+            const client = new APIClient();
+            const data = await client.createConnection(this.name.trim(), this.dataSource);
+            window.location.href = data.redirectURL;
+          } catch (e) {
+            this.error = e.message;
+            this.submitting = false;
+          }
+        }
+      }">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
+    <div class="flex items-center gap-4">
+      <a href="/connections" class="text-sm text-gray-600 hover:text-gray-800">← コネクション一覧</a>
+      <button @click="logout()"
+              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        ログアウト
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-lg mx-auto px-6 py-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">コネクション作成</h2>
+
+    <!-- ローディング -->
+    <div x-show="loading" class="text-center py-12 text-gray-400">
+      <p>データソース一覧を読み込み中...</p>
+    </div>
+
+    <div x-show="!loading">
+      <!-- エラー -->
+      <div x-show="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
+        <p x-text="error"></p>
+      </div>
+
+      <form @submit.prevent="submit" class="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        <!-- データソース -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            データソース <span class="text-red-500">*</span>
+          </label>
+          <select x-model="dataSource"
+                  required
+                  class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white">
+            <option value="" disabled>データソースを選択してください</option>
+            <template x-for="ds in datasources" :key="ds.dataSource">
+              <option :value="ds.dataSource" x-text="ds.dataSource"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- コネクション名 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            コネクション名 <span class="text-red-500">*</span>
+          </label>
+          <input type="text"
+                 x-model="name"
+                 placeholder="例: My Salesforce"
+                 required
+                 class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+        </div>
+
+        <!-- 説明 -->
+        <p class="text-xs text-gray-400">
+          「作成」をクリックすると Connect AI の認証画面へ移動します。<br>
+          認証情報を入力して接続を完了してください。
+        </p>
+
+        <!-- ボタン -->
+        <div class="flex gap-3 pt-1">
+          <button type="submit"
+                  :disabled="submitting || !name.trim() || !dataSource"
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white text-sm font-medium py-2 rounded-lg transition-colors">
+            <span x-show="!submitting">作成して認証画面へ</span>
+            <span x-show="submitting">処理中...</span>
+          </button>
+          <a href="/connections"
+             class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded-lg transition-colors">
+            キャンセル
+          </a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

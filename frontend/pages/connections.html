@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>コネクション管理 - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen"
+      x-data="{
+        connections: [],
+        loading: true,
+        error: null,
+        async init() {
+          try {
+            const client = new APIClient();
+            const data = await client.getConnections();
+            this.connections = data.connections;
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+        async deleteConnection(connectionId, connectionName) {
+          if (!confirm(`「${connectionName}」を削除しますか？`)) return;
+          try {
+            const client = new APIClient();
+            await client.deleteConnection(connectionId);
+            this.connections = this.connections.filter(c => c.id !== connectionId);
+          } catch (e) {
+            alert('削除に失敗しました: ' + e.message);
+          }
+        }
+      }">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
+    <div class="flex items-center gap-4">
+      <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-800">ダッシュボード</a>
+      <button @click="logout()"
+              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        ログアウト
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold text-gray-800">コネクション管理</h2>
+      <a href="/connections/new"
+         class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+        + 新規作成
+      </a>
+    </div>
+
+    <!-- ローディング -->
+    <div x-show="loading" class="text-center py-12 text-gray-400">
+      <p>読み込み中...</p>
+    </div>
+
+    <!-- エラー -->
+    <div x-show="!loading && error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
+      <p x-text="error"></p>
+    </div>
+
+    <!-- コネクション一覧 -->
+    <div x-show="!loading && !error">
+      <!-- 空の場合 -->
+      <div x-show="connections.length === 0"
+           class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <p class="text-gray-400 text-sm">コネクションがありません</p>
+        <a href="/connections/new"
+           class="inline-block mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium">
+          最初のコネクションを作成する →
+        </a>
+      </div>
+
+      <!-- 一覧テーブル -->
+      <div x-show="connections.length > 0" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">コネクション名</th>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">データソース</th>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">ステータス</th>
+              <th class="px-6 py-3"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="conn in connections" :key="conn.id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 font-medium text-gray-800" x-text="conn.name"></td>
+                <td class="px-6 py-4 text-gray-600" x-text="conn.dataSource"></td>
+                <td class="px-6 py-4">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="conn.status === 'active'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'"
+                        x-text="conn.status === 'active' ? 'アクティブ' : conn.status">
+                  </span>
+                </td>
+                <td class="px-6 py-4 text-right">
+                  <button @click="deleteConnection(conn.id, conn.name)"
+                          class="text-red-500 hover:text-red-700 text-sm font-medium transition-colors">
+                    削除
+                  </button>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

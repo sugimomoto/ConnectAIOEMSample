@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダッシュボード - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen"
+      x-data="{
+        user: null,
+        async init() {
+          try {
+            const client = new APIClient();
+            const data = await client.getMe();
+            this.user = data.user;
+          } catch (e) {
+            // 401 の場合は api-client.js が /login へリダイレクト
+          }
+        }
+      }">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
+    <div class="flex items-center gap-4">
+      <span x-show="user" class="text-sm text-gray-600" x-text="user?.name"></span>
+      <button @click="logout()"
+              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        ログアウト
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <div x-show="user">
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">
+        ようこそ、<span x-text="user?.name"></span> さん
+      </h2>
+      <p class="text-gray-500 text-sm mb-8">DataHub へのログインが完了しました。</p>
+
+      <div class="bg-white rounded-xl border border-gray-200 p-6 mb-4">
+        <h3 class="text-base font-semibold text-gray-700 mb-4">アカウント情報</h3>
+        <dl class="space-y-2 text-sm">
+          <div class="flex gap-4">
+            <dt class="text-gray-500 w-40">メールアドレス</dt>
+            <dd class="text-gray-800" x-text="user?.email"></dd>
+          </div>
+          <div class="flex gap-4">
+            <dt class="text-gray-500 w-40">Connect AI アカウント</dt>
+            <dd class="text-gray-800">
+              <span x-show="user?.connect_ai_account_id" x-text="user?.connect_ai_account_id" class="font-mono text-xs"></span>
+              <span x-show="!user?.connect_ai_account_id" class="text-yellow-600">未連携（管理者にお問い合わせください）</span>
+            </dd>
+          </div>
+        </dl>
+      </div>
+
+      <div class="bg-white rounded-xl border border-gray-200 p-6">
+        <h3 class="text-base font-semibold text-gray-700 mb-4">データ管理</h3>
+        <a href="/connections"
+           class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+          <div>
+            <p class="text-sm font-medium text-gray-800">コネクション管理</p>
+            <p class="text-xs text-gray-400 mt-0.5">外部データソースへの接続を管理する</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+        <a href="/explorer"
+           class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors mt-2">
+          <div>
+            <p class="text-sm font-medium text-gray-800">メタデータエクスプローラー</p>
+            <p class="text-xs text-gray-400 mt-0.5">データソースのテーブル・カラム情報を参照する</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+        <a href="/query"
+           class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors mt-2">
+          <div>
+            <p class="text-sm font-medium text-gray-800">クエリビルダー</p>
+            <p class="text-xs text-gray-400 mt-0.5">SQL を書かずにデータを検索・抽出する</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+        <a href="/data-browser"
+           class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors mt-2">
+          <div>
+            <p class="text-sm font-medium text-gray-800">データブラウザ</p>
+            <p class="text-xs text-gray-400 mt-0.5">レコードの閲覧・作成・編集・削除を行う</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+</body>
+</html>

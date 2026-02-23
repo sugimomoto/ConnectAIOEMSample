@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メタデータエクスプローラー - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="explorerData()">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
+    <div class="flex items-center gap-4">
+      <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-800">ダッシュボード</a>
+      <button @click="logout()"
+              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        ログアウト
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <h2 class="text-2xl font-bold text-gray-800 mb-6">メタデータエクスプローラー</h2>
+
+    <!-- セレクションパネル -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <div class="space-y-4">
+
+        <!-- コネクション -->
+        <div class="grid grid-cols-4 items-center gap-4">
+          <label class="text-sm font-medium text-gray-600 text-right">コネクション</label>
+          <div class="col-span-3">
+            <div x-show="connections.length === 0 && !error" class="text-sm text-gray-400 py-2">
+              コネクションがありません。先に<a href="/connections" class="text-blue-600 hover:underline">コネクションを作成</a>してください。
+            </div>
+            <select x-show="connections.length > 0"
+                    x-model="selectedConnectionId"
+                    @change="onConnectionChange()"
+                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">選択してください</option>
+              <template x-for="conn in connections" :key="conn.id">
+                <option :value="conn.id" x-text="conn.name"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <!-- カタログ -->
+        <div x-show="catalogs.length > 0" class="grid grid-cols-4 items-center gap-4">
+          <label class="text-sm font-medium text-gray-600 text-right">カタログ</label>
+          <div class="col-span-3">
+            <select x-model="selectedCatalog"
+                    @change="onCatalogChange()"
+                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">選択してください</option>
+              <template x-for="cat in catalogs" :key="cat.TABLE_CATALOG">
+                <option :value="cat.TABLE_CATALOG" x-text="cat.TABLE_CATALOG"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <!-- スキーマ -->
+        <div x-show="schemas.length > 0" class="grid grid-cols-4 items-center gap-4">
+          <label class="text-sm font-medium text-gray-600 text-right">スキーマ</label>
+          <div class="col-span-3">
+            <select x-model="selectedSchema"
+                    @change="onSchemaChange()"
+                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">選択してください</option>
+              <template x-for="sch in schemas" :key="sch.TABLE_SCHEMA">
+                <option :value="sch.TABLE_SCHEMA" x-text="sch.TABLE_SCHEMA"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <!-- テーブル -->
+        <div x-show="tables.length > 0" class="grid grid-cols-4 items-center gap-4">
+          <label class="text-sm font-medium text-gray-600 text-right">テーブル</label>
+          <div class="col-span-3">
+            <select x-model="selectedTable"
+                    @change="onTableChange()"
+                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">選択してください</option>
+              <template x-for="tbl in tables" :key="tbl.TABLE_NAME">
+                <option :value="tbl.TABLE_NAME" x-text="tbl.TABLE_NAME"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ローディング -->
+    <div x-show="loading" class="text-center py-8 text-gray-400 text-sm">
+      読み込み中...
+    </div>
+
+    <!-- エラー -->
+    <div x-show="!loading && error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+      <p x-text="error"></p>
+    </div>
+
+    <!-- カラム一覧 -->
+    <div x-show="!loading && columns.length > 0">
+      <div class="flex items-center gap-2 mb-3">
+        <h3 class="text-sm font-semibold text-gray-700">カラム一覧</h3>
+        <span class="text-xs text-gray-400 font-mono" x-text="selectedTable"></span>
+        <span class="text-xs text-gray-400" x-text="`（${columns.length} 件）`"></span>
+      </div>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">#</th>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">カラム名</th>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">データ型</th>
+              <th class="text-left px-6 py-3 text-gray-500 font-medium">NULL 可否</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="(col, i) in columns" :key="col.COLUMN_NAME">
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-3 text-gray-400 text-xs" x-text="i + 1"></td>
+                <td class="px-6 py-3 font-medium text-gray-800" x-text="col.COLUMN_NAME"></td>
+                <td class="px-6 py-3 text-gray-600 font-mono text-xs" x-text="col.TYPE_NAME"></td>
+                <td class="px-6 py-3">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
+                        :class="col.IS_NULLABLE ? 'bg-gray-100 text-gray-600' : 'bg-blue-50 text-blue-700'"
+                        x-text="col.IS_NULLABLE ? 'YES' : 'NO'">
+                  </span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script>
+    function explorerData() {
+      return {
+        connections: [],
+        selectedConnectionId: '',
+        catalogs: [],
+        selectedCatalog: '',
+        schemas: [],
+        selectedSchema: '',
+        tables: [],
+        selectedTable: '',
+        columns: [],
+        loading: false,
+        error: null,
+
+        async init() {
+          try {
+            const client = new APIClient();
+            const data = await client.getConnections();
+            this.connections = data.connections;
+            if (this.connections.length > 0) {
+              this.selectedConnectionId = this.connections[0].id;
+              await this.onConnectionChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          }
+        },
+
+        async onConnectionChange() {
+          this.catalogs = [];
+          this.selectedCatalog = '';
+          this.schemas = [];
+          this.selectedSchema = '';
+          this.tables = [];
+          this.selectedTable = '';
+          this.columns = [];
+          this.error = null;
+          if (!this.selectedConnectionId) return;
+          this.loading = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getCatalogs(this.selectedConnectionId);
+            this.catalogs = data.catalogs;
+            if (this.catalogs.length > 0) {
+              this.selectedCatalog = this.catalogs[0].TABLE_CATALOG;
+              await this.onCatalogChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async onCatalogChange() {
+          this.schemas = [];
+          this.selectedSchema = '';
+          this.tables = [];
+          this.selectedTable = '';
+          this.columns = [];
+          this.error = null;
+          if (!this.selectedCatalog) return;
+          this.loading = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getSchemas(this.selectedConnectionId, this.selectedCatalog);
+            this.schemas = data.schemas;
+            if (this.schemas.length > 0) {
+              this.selectedSchema = this.schemas[0].TABLE_SCHEMA;
+              await this.onSchemaChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async onSchemaChange() {
+          this.tables = [];
+          this.selectedTable = '';
+          this.columns = [];
+          this.error = null;
+          if (!this.selectedSchema) return;
+          this.loading = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getTables(this.selectedConnectionId, this.selectedCatalog, this.selectedSchema);
+            this.tables = data.tables;
+            if (this.tables.length > 0) {
+              this.selectedTable = this.tables[0].TABLE_NAME;
+              await this.onTableChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async onTableChange() {
+          this.columns = [];
+          this.error = null;
+          if (!this.selectedTable) return;
+          this.loading = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getColumns(
+              this.selectedConnectionId,
+              this.selectedCatalog,
+              this.selectedSchema,
+              this.selectedTable
+            );
+            this.columns = data.columns;
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+      };
+    }
+  </script>
+</body>
+</html>

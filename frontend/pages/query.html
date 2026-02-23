@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>クエリビルダー - DataHub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="queryBuilderData()">
+
+  <!-- ヘッダー -->
+  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
+    <div class="flex items-center gap-4">
+      <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-800">ダッシュボード</a>
+      <button @click="logout()"
+              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
+        ログアウト
+      </button>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-screen-xl mx-auto px-6 py-6">
+    <h2 class="text-2xl font-bold text-gray-800 mb-4">クエリビルダー</h2>
+
+    <div class="flex gap-5 items-start">
+
+      <!-- ========== 左カラム: 設定パネル ========== -->
+      <div class="w-80 flex-shrink-0 space-y-4">
+
+        <!-- [1] データソース選択 -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">データソース</h3>
+          <div class="space-y-2.5">
+
+            <!-- コネクション -->
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">コネクション</label>
+              <div x-show="connections.length === 0 && !error" class="text-xs text-gray-400 py-1">
+                <a href="/connections" class="text-blue-600 hover:underline">コネクションを作成</a>してください
+              </div>
+              <select x-show="connections.length > 0"
+                      x-model="selectedConnectionId"
+                      @change="onConnectionChange()"
+                      class="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">選択してください</option>
+                <template x-for="conn in connections" :key="conn.id">
+                  <option :value="conn.id" x-text="conn.name"></option>
+                </template>
+              </select>
+            </div>
+
+            <!-- カタログ -->
+            <div x-show="catalogs.length > 0">
+              <label class="block text-xs text-gray-500 mb-1">カタログ</label>
+              <select x-model="selectedCatalog" @change="onCatalogChange()"
+                      class="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">選択してください</option>
+                <template x-for="cat in catalogs" :key="cat.TABLE_CATALOG">
+                  <option :value="cat.TABLE_CATALOG" x-text="cat.TABLE_CATALOG"></option>
+                </template>
+              </select>
+            </div>
+
+            <!-- スキーマ -->
+            <div x-show="schemas.length > 0">
+              <label class="block text-xs text-gray-500 mb-1">スキーマ</label>
+              <select x-model="selectedSchema" @change="onSchemaChange()"
+                      class="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">選択してください</option>
+                <template x-for="sch in schemas" :key="sch.TABLE_SCHEMA">
+                  <option :value="sch.TABLE_SCHEMA" x-text="sch.TABLE_SCHEMA"></option>
+                </template>
+              </select>
+            </div>
+
+            <!-- テーブル -->
+            <div x-show="tables.length > 0">
+              <label class="block text-xs text-gray-500 mb-1">テーブル</label>
+              <select x-model="selectedTable" @change="onTableChange()"
+                      class="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">選択してください</option>
+                <template x-for="tbl in tables" :key="tbl.TABLE_NAME">
+                  <option :value="tbl.TABLE_NAME" x-text="tbl.TABLE_NAME"></option>
+                </template>
+              </select>
+            </div>
+
+            <!-- メタデータ ローディング -->
+            <div x-show="loadingMeta" class="text-xs text-gray-400">読み込み中...</div>
+
+          </div>
+        </div>
+
+        <!-- [2] カラム選択 -->
+        <div x-show="availableColumns.length > 0" class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">カラム選択</h3>
+          <div class="flex flex-wrap gap-1.5">
+            <!-- すべて -->
+            <label class="flex items-center gap-1 text-xs cursor-pointer px-2.5 py-1 rounded-md border transition-colors"
+                   :class="selectAllColumns ? 'bg-blue-50 border-blue-400 text-blue-700 font-medium' : 'border-gray-300 text-gray-600 hover:bg-gray-50'">
+              <input type="checkbox" class="hidden" :checked="selectAllColumns" @change="toggleSelectAll()">
+              <span>すべて</span>
+            </label>
+            <!-- 個別カラム -->
+            <template x-for="col in availableColumns" :key="col.COLUMN_NAME">
+              <label class="flex items-center gap-1 text-xs cursor-pointer px-2.5 py-1 rounded-md border transition-colors"
+                     :class="!selectAllColumns && selectedColumns.includes(col.COLUMN_NAME)
+                       ? 'bg-blue-50 border-blue-400 text-blue-700 font-medium'
+                       : 'border-gray-300 text-gray-600 hover:bg-gray-50'"
+                     :style="selectAllColumns ? 'opacity:0.5; pointer-events:none;' : ''">
+                <input type="checkbox" class="hidden"
+                       :checked="!selectAllColumns && selectedColumns.includes(col.COLUMN_NAME)"
+                       @change="toggleColumn(col.COLUMN_NAME)">
+                <span x-text="col.COLUMN_NAME"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- [3] WHERE 条件 -->
+        <div x-show="availableColumns.length > 0" class="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+            WHERE 条件
+            <span class="text-gray-400 font-normal normal-case tracking-normal ml-1">AND 結合</span>
+          </h3>
+
+          <div class="space-y-2 mb-3">
+            <template x-for="cond in conditions" :key="cond.id">
+              <div class="space-y-1.5 p-2.5 bg-gray-50 rounded-lg border border-gray-200">
+                <div class="flex items-center gap-1.5">
+                  <!-- カラム -->
+                  <select x-model="cond.column"
+                          class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white min-w-0">
+                    <option value="">カラム</option>
+                    <template x-for="col in availableColumns" :key="col.COLUMN_NAME">
+                      <option :value="col.COLUMN_NAME" x-text="col.COLUMN_NAME"></option>
+                    </template>
+                  </select>
+                  <!-- 削除ボタン -->
+                  <button @click="removeCondition(cond.id)"
+                          class="text-gray-300 hover:text-red-400 transition-colors flex-shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <!-- 演算子 -->
+                  <select x-model="cond.operator"
+                          class="text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white w-24 flex-shrink-0">
+                    <template x-for="op in operators" :key="op">
+                      <option :value="op" x-text="op"></option>
+                    </template>
+                  </select>
+                  <!-- 値 -->
+                  <input type="text" x-model="cond.value"
+                         :placeholder="cond.operator === 'IN' ? '値1, 値2' : '値'"
+                         class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0">
+                </div>
+                <!-- 値2（BETWEEN のみ） -->
+                <template x-if="cond.operator === 'BETWEEN'">
+                  <div class="flex items-center gap-1.5">
+                    <span class="text-xs text-gray-400 w-24 text-center flex-shrink-0">～</span>
+                    <input type="text" x-model="cond.value2" placeholder="終端値"
+                           class="flex-1 text-xs border border-gray-300 rounded-md px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0">
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+
+          <button @click="addCondition()"
+                  class="text-xs text-blue-600 hover:text-blue-700 font-medium">
+            + 条件を追加
+          </button>
+        </div>
+
+      </div>
+
+      <!-- ========== 右カラム: 結果パネル ========== -->
+      <div class="flex-1 min-w-0">
+
+        <!-- 実行ボタン -->
+        <div x-show="selectedTable" class="flex items-center gap-3 mb-4">
+          <button @click="executeQuery()"
+                  :disabled="executing"
+                  class="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors flex items-center gap-2">
+            <svg x-show="!executing" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span x-text="executing ? '実行中...' : '実行'"></span>
+          </button>
+          <button x-show="hasResults" @click="downloadCSV()"
+                  class="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg border border-gray-300 transition-colors flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+            </svg>
+            CSV
+          </button>
+        </div>
+
+        <!-- エラー -->
+        <div x-show="error" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-4">
+          <p x-text="error"></p>
+        </div>
+
+        <!-- 実行中 -->
+        <div x-show="executing" class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <p class="text-gray-400 text-sm">実行中...</p>
+        </div>
+
+        <!-- 結果あり -->
+        <div x-show="!executing && hasResults">
+          <!-- 件数・実行時間 -->
+          <div class="flex items-center gap-3 mb-3">
+            <span class="text-sm font-semibold text-gray-700" x-text="`${total} 件`"></span>
+            <span class="text-xs text-gray-400" x-text="`${elapsedMs} ms`"></span>
+            <span x-show="total === 1000" class="text-xs text-yellow-600">（上限 1,000 件に達しました）</span>
+          </div>
+
+          <!-- テーブル -->
+          <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <template x-for="col in resultColumns" :key="col">
+                      <th class="text-left px-4 py-3 text-gray-500 font-medium whitespace-nowrap" x-text="col"></th>
+                    </template>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                  <template x-for="(row, i) in pagedRows" :key="i">
+                    <tr class="hover:bg-gray-50">
+                      <template x-for="(cell, j) in row" :key="j">
+                        <td class="px-4 py-2.5 text-gray-700 whitespace-nowrap max-w-xs truncate"
+                            :title="String(cell ?? '')"
+                            x-text="cell ?? ''">
+                        </td>
+                      </template>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ページネーション -->
+          <div x-show="totalPages > 1" class="flex items-center justify-center gap-2 mt-4">
+            <button @click="page = Math.max(1, page - 1)" :disabled="page === 1"
+                    class="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+              &laquo; 前へ
+            </button>
+            <span class="text-sm text-gray-600" x-text="`${page} / ${totalPages}`"></span>
+            <button @click="page = Math.min(totalPages, page + 1)" :disabled="page === totalPages"
+                    class="text-sm px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-40 transition-colors">
+              次へ &raquo;
+            </button>
+          </div>
+        </div>
+
+        <!-- 結果なし -->
+        <div x-show="!executing && !error && resultColumns.length > 0 && total === 0"
+             class="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <p class="text-gray-400 text-sm">該当するデータがありません</p>
+        </div>
+
+        <!-- 未実行プレースホルダー -->
+        <div x-show="!executing && !error && resultColumns.length === 0 && selectedTable"
+             class="bg-white rounded-xl border border-gray-200 border-dashed p-16 text-center">
+          <p class="text-gray-300 text-sm">実行ボタンをクリックすると結果がここに表示されます</p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <script src="/static/js/api-client.js"></script>
+  <script src="/static/js/auth.js"></script>
+  <script>
+    function queryBuilderData() {
+      return {
+        // データソース選択
+        connections: [],
+        selectedConnectionId: '',
+        catalogs: [],
+        selectedCatalog: '',
+        schemas: [],
+        selectedSchema: '',
+        tables: [],
+        selectedTable: '',
+
+        // カラム選択
+        availableColumns: [],
+        selectedColumns: [],
+        selectAllColumns: true,
+
+        // WHERE 条件
+        conditions: [],
+        operators: ['=', '<>', '<', '>', '<=', '>=', 'LIKE', 'IN', 'BETWEEN'],
+
+        // UI 状態
+        loadingMeta: false,
+        executing: false,
+        error: null,
+
+        // 結果
+        resultColumns: [],
+        resultRows: [],
+        total: 0,
+        elapsedMs: 0,
+        page: 1,
+        pageSize: 20,
+
+        get totalPages() { return Math.ceil(this.total / this.pageSize); },
+        get pagedRows() {
+          const start = (this.page - 1) * this.pageSize;
+          return this.resultRows.slice(start, start + this.pageSize);
+        },
+        get hasResults() { return this.resultColumns.length > 0 && this.total > 0; },
+
+        async init() {
+          try {
+            const client = new APIClient();
+            const data = await client.getConnections();
+            this.connections = data.connections;
+            if (this.connections.length > 0) {
+              this.selectedConnectionId = this.connections[0].id;
+              await this.onConnectionChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          }
+        },
+
+        async onConnectionChange() {
+          this.catalogs = []; this.selectedCatalog = '';
+          this.schemas = []; this.selectedSchema = '';
+          this.tables = []; this.selectedTable = '';
+          this.availableColumns = []; this.selectedColumns = [];
+          this.resultColumns = []; this.resultRows = []; this.total = 0;
+          this.error = null;
+          if (!this.selectedConnectionId) return;
+          this.loadingMeta = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getCatalogs(this.selectedConnectionId);
+            this.catalogs = data.catalogs;
+            if (this.catalogs.length > 0) {
+              this.selectedCatalog = this.catalogs[0].TABLE_CATALOG;
+              await this.onCatalogChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loadingMeta = false;
+          }
+        },
+
+        async onCatalogChange() {
+          this.schemas = []; this.selectedSchema = '';
+          this.tables = []; this.selectedTable = '';
+          this.availableColumns = []; this.selectedColumns = [];
+          this.resultColumns = []; this.resultRows = []; this.total = 0;
+          this.error = null;
+          if (!this.selectedCatalog) return;
+          this.loadingMeta = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getSchemas(this.selectedConnectionId, this.selectedCatalog);
+            this.schemas = data.schemas;
+            if (this.schemas.length > 0) {
+              this.selectedSchema = this.schemas[0].TABLE_SCHEMA;
+              await this.onSchemaChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loadingMeta = false;
+          }
+        },
+
+        async onSchemaChange() {
+          this.tables = []; this.selectedTable = '';
+          this.availableColumns = []; this.selectedColumns = [];
+          this.resultColumns = []; this.resultRows = []; this.total = 0;
+          this.error = null;
+          if (!this.selectedSchema) return;
+          this.loadingMeta = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getTables(this.selectedConnectionId, this.selectedCatalog, this.selectedSchema);
+            this.tables = data.tables;
+            if (this.tables.length > 0) {
+              this.selectedTable = this.tables[0].TABLE_NAME;
+              await this.onTableChange();
+            }
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loadingMeta = false;
+          }
+        },
+
+        async onTableChange() {
+          this.availableColumns = []; this.selectedColumns = []; this.selectAllColumns = true;
+          this.conditions = [];
+          this.resultColumns = []; this.resultRows = []; this.total = 0;
+          this.error = null;
+          if (!this.selectedTable) return;
+          this.loadingMeta = true;
+          try {
+            const client = new APIClient();
+            const data = await client.getColumns(
+              this.selectedConnectionId, this.selectedCatalog, this.selectedSchema, this.selectedTable
+            );
+            this.availableColumns = data.columns;
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.loadingMeta = false;
+          }
+        },
+
+        toggleSelectAll() {
+          this.selectAllColumns = !this.selectAllColumns;
+          if (this.selectAllColumns) this.selectedColumns = [];
+        },
+
+        toggleColumn(name) {
+          if (this.selectAllColumns) {
+            this.selectAllColumns = false;
+            this.selectedColumns = [name];
+          } else {
+            const idx = this.selectedColumns.indexOf(name);
+            if (idx === -1) {
+              this.selectedColumns.push(name);
+            } else {
+              this.selectedColumns.splice(idx, 1);
+            }
+          }
+        },
+
+        addCondition() {
+          this.conditions.push({ id: Date.now(), column: '', operator: '=', value: '', value2: '' });
+        },
+
+        removeCondition(id) {
+          this.conditions = this.conditions.filter(c => c.id !== id);
+        },
+
+        async executeQuery() {
+          this.executing = true;
+          this.error = null;
+          this.resultColumns = []; this.resultRows = []; this.total = 0; this.page = 1;
+          try {
+            const client = new APIClient();
+            const columns = this.selectAllColumns ? [] : [...this.selectedColumns];
+            const conditions = this.conditions
+              .filter(c => c.column && c.operator)
+              .map(({ column, operator, value, value2 }) => ({ column, operator, value, value2 }));
+            const data = await client.executeQuery(
+              this.selectedConnectionId,
+              this.selectedCatalog,
+              this.selectedSchema,
+              this.selectedTable,
+              columns,
+              conditions,
+            );
+            this.resultColumns = data.columns;
+            this.resultRows = data.rows;
+            this.total = data.total;
+            this.elapsedMs = data.elapsed_ms;
+          } catch (e) {
+            this.error = e.message;
+          } finally {
+            this.executing = false;
+          }
+        },
+
+        downloadCSV() {
+          const header = this.resultColumns.join(',');
+          const body = this.resultRows.map(row =>
+            row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')
+          ).join('\n');
+          const blob = new Blob([header + '\n' + body], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${this.selectedTable}_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+          a.click();
+          URL.revokeObjectURL(url);
+        },
+      };
+    }
+  </script>
+</body>
+</html>
