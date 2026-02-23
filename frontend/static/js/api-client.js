@@ -118,4 +118,15 @@ class APIClient {
   async deleteApiKey() {
     return this.request('DELETE', '/settings/api-key');
   }
+
+  async chatWithAI(message, catalogName = null) {
+    return this.request('POST', '/ai-assistant/chat', {
+      message,
+      catalog_name: catalogName,
+    });
+  }
+
+  async resetChat() {
+    return this.request('POST', '/ai-assistant/reset');
+  }
 }
