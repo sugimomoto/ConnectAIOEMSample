@@ -12,6 +12,7 @@ CData Connect AI Embedded Cloud のAPI仕様をまとめたリファレンスで
 6. [監査API](./audit-api.md) - 監査ログ取得
 7. [メタデータAPI](./metadata-api.md) - スキーマ、テーブル、カラム情報の取得
 8. [SQL API](./sql-api.md) - クエリ実行、バッチ操作、プロシージャ実行
+9. [MCP API](./mcp-api.md) - Model Context Protocol による AI アシスタント連携（Streamable HTTP）
 
 ## ベースURL
 
@@ -37,6 +38,10 @@ https://cloud.cdata.com/api
 
 [SQL API](./sql-api.md)を使用してデータをクエリします。
 
+### 5. AI アシスタントとの連携
+
+[MCP API](./mcp-api.md)を使用して、Claude などの AI モデルからデータに自然言語でアクセスします。
+
 ## 参考リンク
 
 - [CData Connect AI 公式ドキュメント](https://docs.cloud.cdata.com/ja/API/API-Embedded)
@@ -46,4 +51,4 @@ https://cloud.cdata.com/api
 
 ---
 
-**最終更新日：** 2026-02-17
+**最終更新日：** 2026-02-23
