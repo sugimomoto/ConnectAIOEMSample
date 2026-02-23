@@ -26,23 +26,6 @@
           <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">データソース</h3>
           <div class="space-y-2.5">
 
-            <!-- コネクション -->
-            <div>
-              <label class="block text-xs text-gray-500 mb-1">コネクション</label>
-              <div x-show="connections.length === 0 && !error" class="text-xs text-gray-400 py-1">
-                <a href="/connections" class="text-blue-600 hover:underline">コネクションを作成</a>してください
-              </div>
-              <select x-show="connections.length > 0"
-                      x-model="selectedConnectionId"
-                      @change="onConnectionChange()"
-                      class="w-full text-sm border border-gray-300 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-                <option value="">選択してください</option>
-                <template x-for="conn in connections" :key="conn.id">
-                  <option :value="conn.id" x-text="conn.name"></option>
-                </template>
-              </select>
-            </div>
-
             <!-- カタログ -->
             <div x-show="catalogs.length > 0">
               <label class="block text-xs text-gray-500 mb-1">カタログ</label>
@@ -282,8 +265,6 @@
     function dataBrowserData() {
       return {
         // データソース選択
-        connections: [],
-        selectedConnectionId: '',
         catalogs: [],
         selectedCatalog: '',
         schemas: [],
@@ -332,31 +313,10 @@
         },
 
         async init() {
-          try {
-            const client = new APIClient();
-            const data = await client.getConnections();
-            this.connections = data.connections;
-            if (this.connections.length > 0) {
-              this.selectedConnectionId = this.connections[0].id;
-              await this.onConnectionChange();
-            }
-          } catch (e) {
-            this.error = e.message;
-          }
-        },
-
-        async onConnectionChange() {
-          this.catalogs = []; this.selectedCatalog = '';
-          this.schemas = []; this.selectedSchema = '';
-          this.tables = []; this.selectedTable = '';
-          this.columns = []; this.keyColumn = '';
-          this.recordColumns = []; this.recordRows = []; this.total = -1; this.offset = 0;
-          this.error = null;
-          if (!this.selectedConnectionId) return;
           this.loadingMeta = true;
           try {
             const client = new APIClient();
-            const data = await client.getCatalogs(this.selectedConnectionId);
+            const data = await client.getCatalogs();
             this.catalogs = data.catalogs;
             if (this.catalogs.length > 0) {
               this.selectedCatalog = this.catalogs[0].TABLE_CATALOG;
@@ -379,7 +339,7 @@
           this.loadingMeta = true;
           try {
             const client = new APIClient();
-            const data = await client.getSchemas(this.selectedConnectionId, this.selectedCatalog);
+            const data = await client.getSchemas(this.selectedCatalog);
             this.schemas = data.schemas;
             if (this.schemas.length > 0) {
               this.selectedSchema = this.schemas[0].TABLE_SCHEMA;
@@ -401,7 +361,7 @@
           this.loadingMeta = true;
           try {
             const client = new APIClient();
-            const data = await client.getTables(this.selectedConnectionId, this.selectedCatalog, this.selectedSchema);
+            const data = await client.getTables(this.selectedCatalog, this.selectedSchema);
             this.tables = data.tables;
             if (this.tables.length > 0) {
               this.selectedTable = this.tables[0].TABLE_NAME;
@@ -424,7 +384,7 @@
           try {
             const client = new APIClient();
             const data = await client.getColumns(
-              this.selectedConnectionId, this.selectedCatalog, this.selectedSchema, this.selectedTable
+              this.selectedCatalog, this.selectedSchema, this.selectedTable
             );
             this.columns = data.columns;
             if (this.columns.length > 0) this.keyColumn = this.columns[0].COLUMN_NAME;
@@ -444,7 +404,7 @@
           try {
             const client = new APIClient();
             const data = await client.getRecords(
-              this.selectedConnectionId, this.selectedCatalog, this.selectedSchema,
+              '', this.selectedCatalog, this.selectedSchema,
               this.selectedTable, this.limit, this.offset,
             );
             this.recordColumns = data.columns;
@@ -503,7 +463,7 @@
             const client = new APIClient();
             if (this.modalMode === 'create') {
               await client.createRecord(
-                this.selectedConnectionId, this.selectedCatalog, this.selectedSchema,
+                '', this.selectedCatalog, this.selectedSchema,
                 this.selectedTable, { ...this.formData },
               );
               this.successMessage = 'レコードを追加しました。';
@@ -512,7 +472,7 @@
               const keyIdx = this.recordColumns.indexOf(this.keyColumn);
               const where = { [this.keyColumn]: String(originalRow[keyIdx] ?? '') };
               await client.updateRecord(
-                this.selectedConnectionId, this.selectedCatalog, this.selectedSchema,
+                '', this.selectedCatalog, this.selectedSchema,
                 this.selectedTable, { ...this.formData }, where,
               );
               this.successMessage = 'レコードを更新しました。';
@@ -541,7 +501,7 @@
           try {
             const client = new APIClient();
             await client.deleteRecord(
-              this.selectedConnectionId, this.selectedCatalog, this.selectedSchema,
+              '', this.selectedCatalog, this.selectedSchema,
               this.selectedTable, where,
             );
             this.successMessage = 'レコードを削除しました。';

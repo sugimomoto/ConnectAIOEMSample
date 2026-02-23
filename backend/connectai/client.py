@@ -253,30 +253,27 @@ class ConnectAIClient:
             ) from e
         return columns, rows
 
-    def get_catalogs(self, connection_id: str) -> list[dict]:
+    def get_catalogs(self) -> list[dict]:
         """
         カタログ一覧を返す。
 
         Returns:
             [{"TABLE_CATALOG": "...", "DATA_SOURCE": "...", "CONNECTION_ID": "..."}, ...]
         """
-        data = self._get("/catalogs", params={"connectionId": connection_id})
+        data = self._get("/catalogs")
         return self._rows_to_dicts(data["results"][0])
 
-    def get_schemas(self, connection_id: str, catalog_name: str) -> list[dict]:
+    def get_schemas(self, catalog_name: str) -> list[dict]:
         """
         スキーマ一覧を返す。
 
         Returns:
             [{"TABLE_CATALOG": "...", "TABLE_SCHEMA": "..."}, ...]
         """
-        data = self._get("/schemas", params={
-            "connectionId": connection_id,
-            "catalogName": catalog_name,
-        })
+        data = self._get("/schemas", params={"catalogName": catalog_name})
         return self._rows_to_dicts(data["results"][0])
 
-    def get_tables(self, connection_id: str, catalog_name: str, schema_name: str) -> list[dict]:
+    def get_tables(self, catalog_name: str, schema_name: str) -> list[dict]:
         """
         テーブル一覧を返す。
 
@@ -284,13 +281,12 @@ class ConnectAIClient:
             [{"TABLE_CATALOG": "...", "TABLE_SCHEMA": "...", "TABLE_NAME": "...", "TABLE_TYPE": "...", "REMARKS": ...}, ...]
         """
         data = self._get("/tables", params={
-            "connectionId": connection_id,
             "catalogName": catalog_name,
             "schemaName": schema_name,
         })
         return self._rows_to_dicts(data["results"][0])
 
-    def get_columns(self, connection_id: str, catalog_name: str, schema_name: str, table_name: str) -> list[dict]:
+    def get_columns(self, catalog_name: str, schema_name: str, table_name: str) -> list[dict]:
         """
         カラム一覧を返す。
 
@@ -298,7 +294,6 @@ class ConnectAIClient:
             [{"COLUMN_NAME": "...", "TYPE_NAME": "...", "IS_NULLABLE": bool, ...}, ...]
         """
         data = self._get("/columns", params={
-            "connectionId": connection_id,
             "catalogName": catalog_name,
             "schemaName": schema_name,
             "tableName": table_name,

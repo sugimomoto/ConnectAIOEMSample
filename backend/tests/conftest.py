@@ -43,7 +43,7 @@ def mock_connect_ai_metadata():
          patch("backend.connectai.client.ConnectAIClient.get_columns") as mock_columns:
 
         mock_catalogs.return_value = [
-            {"TABLE_CATALOG": "Salesforce1", "DATA_SOURCE": "Salesforce", "CONNECTION_ID": "conn-001"},
+            {"TABLE_CATALOG": "Salesforce1", "DATA_SOURCE": "Salesforce"},
         ]
         mock_schemas.return_value = [
             {"TABLE_CATALOG": "Salesforce1", "TABLE_SCHEMA": "dbo"},
