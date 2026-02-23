@@ -3,6 +3,10 @@ set -e
 
 echo "=== ConnectAIOEMSample DevContainer セットアップ ==="
 
+# Claude Code CLI のインストール
+echo "🤖 Claude Code CLI をインストールします..."
+npm install -g @anthropic-ai/claude-code
+
 # 依存パッケージのインストール
 echo "📦 pip install -r backend/requirements.txt ..."
 pip install -r backend/requirements.txt

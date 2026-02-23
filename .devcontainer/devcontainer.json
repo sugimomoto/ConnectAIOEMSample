@@ -1,17 +1,22 @@
 {
   "name": "ConnectAIOEMSample",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
   "forwardPorts": [5001],
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "remoteEnv": {
-    "PYTHONPATH": "${containerWorkspaceFolder}"
+    "PYTHONPATH": "${containerWorkspaceFolder}",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
   },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-python.pylance",
-        "ms-python.debugpy"
+        "ms-python.debugpy",
+        "anthropic.claude-code"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python3.11",
