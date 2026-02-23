@@ -78,16 +78,18 @@ class ConnectAIClient:
             pass  # ログ処理のエラーは本体に伝播させない
 
     def _get(self, path: str, params: dict | None = None) -> dict:
+        from urllib.parse import urlencode
         url = f"{self.base_url}{path}"
+        log_path = f"{path}?{urlencode(params)}" if params else path
         start = time.monotonic()
         try:
             resp = requests.get(url, headers=self._headers(), params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-            self._log(path, "GET", None, data, resp.status_code, start)
+            self._log(log_path, "GET", None, data, resp.status_code, start)
             return data
         except requests.HTTPError as e:
-            self._log(path, "GET", None, {"error": e.response.text}, e.response.status_code, start)
+            self._log(log_path, "GET", None, {"error": e.response.text}, e.response.status_code, start)
             raise ConnectAIError(f"HTTP {e.response.status_code}: {e.response.text}") from e
         except requests.exceptions.JSONDecodeError as e:
             raise ConnectAIError(f"Invalid JSON (HTTP {resp.status_code}): {resp.text[:500]!r}") from e
