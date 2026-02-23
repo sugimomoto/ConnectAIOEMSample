@@ -44,3 +44,14 @@
 - [ ] カタログを選択して質問 → AI が回答する（非ストリーミング）
 - [ ] カタログ未選択で質問 → AI が自律的にカタログを探索して回答する
 - [ ] API Key 未設定時に設定画面への誘導が表示される
+
+### テスト
+- [ ] `backend/tests/test_claude_service.py` を新規作成
+  - Anthropic SDK をモックして `claude_service` の単体テスト
+  - Agentic loop が正しくツール呼び出し→結果送信を繰り返すこと
+  - API Key 未設定時に適切なエラーを返すこと
+- [ ] `backend/tests/test_ai_assistant_api.py` を新規作成
+  - `POST /api/v1/ai-assistant/chat` の正常系・異常系
+  - 未ログイン時 401 が返ること
+  - API Key 未設定時に 422 など適切なエラーが返ること
+- [ ] 全テスト通過確認（`python -m pytest backend/tests/ -v`）

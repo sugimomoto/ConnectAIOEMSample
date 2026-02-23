@@ -37,3 +37,11 @@
 - [ ] `get_tables` で指定カタログのテーブル一覧が取得できる
 - [ ] `query_data` で SQL を実行し結果が取得できる
 - [ ] 別ユーザーの `accountId` では別データが返ることを確認（テナント分離）
+
+### テスト
+- [ ] `backend/tests/test_mcp_client.py` を新規作成
+  - MCP クライアントの各メソッドをモック（requests/httpx）で単体テスト
+  - `get_catalogs`, `get_schemas`, `get_tables`, `get_columns`, `query_data` の正常系
+  - `list_tools` のレスポンスが Anthropic 形式に変換されること
+  - エラーハンドリング（接続エラー・認証エラー）
+- [ ] 全テスト通過確認（`python -m pytest backend/tests/ -v`）
