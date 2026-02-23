@@ -205,6 +205,176 @@ MCP_TOOLS = [
 
 ---
 
+## SSE ストリーミング設計
+
+### 選択理由
+
+AIアシスタントAPIのストリーミング方式として **SSE（Server-Sent Events）** を採用する。
+
+| 方式 | 実装難易度 | UX | 採用理由 |
+|------|-----------|-----|---------|
+| **SSE** ✅ | 中 | 良い | Flask 標準機能のみ。一方向で AI チャットに最適 |
+| WebSocket | 高 | 良い | 双方向通信は不要。Flask-SocketIO 等の追加依存が必要 |
+| Long Polling | 低 | 悪い | チャンク単位の遅延があり UX が劣る |
+| 通常 HTTP | 低 | 普通 | Phase 4-3 で動作確認用として先行実装。デモ品質には不十分 |
+
+SSE を選択した主な理由：
+- AI レスポンスはサーバー→クライアントの **一方向** のため双方向通信は不要
+- Flask の `stream_with_context` + `yield` で **追加ライブラリ不要**
+- ブラウザネイティブの `EventSource` API で Alpine.js から容易に利用可能
+- OEM デモとして「トークンが流れてくる」視覚効果が効果的
+
+### 段階的実装方針
+
+Phase 4-3 で非ストリーミング版を先に実装し、動作確認後に Phase 4-4 で SSE に切り替える。
+
+```
+Phase 4-3: POST /api/v1/ai-assistant/chat → JSON レスポンス（全文一括）
+           ↓ 動作確認
+Phase 4-4: POST /api/v1/ai-assistant/chat → text/event-stream（SSE）
+```
+
+### SSE エンドポイント仕様
+
+```
+POST /api/v1/ai-assistant/chat
+Content-Type: application/json
+
+Response: text/event-stream
+```
+
+リクエストボディ:
+```json
+{
+  "message": "ユーザーの質問文",
+  "catalog_name": "SalesDB"  // 省略可（選択なしの場合）
+}
+```
+
+### SSE イベント形式
+
+各イベントは `event:` と `data:` フィールドで構成する。
+
+```
+event: <イベント種別>
+data: <JSON文字列>
+
+```
+
+#### イベント種別一覧
+
+| イベント名 | 発生タイミング | data の内容 |
+|-----------|--------------|------------|
+| `text_delta` | Claude のテキストトークン受信時 | `{"text": "..."}` |
+| `tool_start` | Claude がツール呼び出しを要求した時 | `{"tool_name": "queryData", "tool_input": {...}}` |
+| `tool_result` | MCP ツールの実行結果を受け取った時 | `{"tool_name": "queryData", "result": "..."}` |
+| `done` | 全ストリーミング完了時 | `{"message": "complete"}` |
+| `error` | エラー発生時 | `{"error": "エラーメッセージ"}` |
+
+#### SSE イベントシーケンス例
+
+```
+event: tool_start
+data: {"tool_name": "getTables", "tool_input": {"catalogName": "SalesDB", "schemaName": "dbo"}}
+
+event: tool_result
+data: {"tool_name": "getTables", "result": "Orders, Customers, ..."}
+
+event: tool_start
+data: {"tool_name": "queryData", "tool_input": {"query": "SELECT TOP 10 ..."}}
+
+event: tool_result
+data: {"tool_name": "queryData", "result": "顧客名,金額\nA社,100000\n..."}
+
+event: text_delta
+data: {"text": "売上"}
+
+event: text_delta
+data: {"text": "上位"}
+
+event: text_delta
+data: {"text": "10件は"}
+
+... （以降トークンごとに繰り返し）
+
+event: done
+data: {"message": "complete"}
+```
+
+### アジェンティックループと SSE の対応
+
+```
+[Anthropic SDK stream()]
+    │
+    ├─ on_text_delta  ──→ SSE: text_delta
+    │
+    └─ stop_reason == "tool_use"
+            │
+            ├─ 各ツール呼び出し前 ──→ SSE: tool_start
+            │
+            ├─ MCP サーバー呼び出し
+            │
+            ├─ 結果受け取り後 ──→ SSE: tool_result
+            │
+            └─ 次ループ（Claude に結果を返して再度 stream()）
+                    │
+                    └─ stop_reason == "end_turn"
+                            │
+                            └─ SSE: done
+```
+
+### Flask バックエンド実装パターン
+
+```python
+# backend/routes/ai_assistant.py
+from flask import Response, stream_with_context
+import json
+
+@ai_assistant_bp.route('/chat', methods=['POST'])
+@login_required
+def chat():
+    def generate():
+        for event_type, event_data in claude_service.stream_chat(message, jwt_token):
+            yield f"event: {event_type}\ndata: {json.dumps(event_data, ensure_ascii=False)}\n\n"
+        yield "event: done\ndata: {\"message\": \"complete\"}\n\n"
+
+    return Response(stream_with_context(generate()), mimetype='text/event-stream')
+```
+
+### Alpine.js フロントエンド実装パターン
+
+```javascript
+// frontend/templates/ai_assistant.html
+function sendMessage() {
+    const es = new EventSource(`/api/v1/ai-assistant/stream?...`);
+    // または POST + fetch でも可（後述）
+
+    es.addEventListener('text_delta', (e) => {
+        const data = JSON.parse(e.data);
+        this.streamingText += data.text;  // リアルタイム追記
+    });
+
+    es.addEventListener('tool_start', (e) => {
+        const data = JSON.parse(e.data);
+        this.toolCalls.push({ name: data.tool_name, input: data.tool_input });
+    });
+
+    es.addEventListener('done', () => {
+        es.close();
+        this.isStreaming = false;
+    });
+
+    es.addEventListener('error', (e) => {
+        es.close();
+        this.showError(JSON.parse(e.data).error);
+    });
+}
+```
+
+> **注意**: `EventSource` は GET リクエストのみサポート。POST でメッセージを送る場合は `fetch` + `ReadableStream` を使うか、セッションにメッセージを一時保存する方式を検討する（Phase 4-4 で実装方針を確定する）。
+
+---
+
 ## セキュリティ考慮事項
 
 - Claude API Key は Fernet 対称暗号で暗号化して DB に保存する
