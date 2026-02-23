@@ -13,6 +13,9 @@ bcrypt==4.1.2
 PyJWT==2.8.0
 cryptography==41.0.7
 
+# AI
+anthropic==0.40.0
+
 # HTTPクライアント（Connect AI API呼び出し用）
 requests==2.31.0
 

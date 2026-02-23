@@ -4,7 +4,7 @@
  *   <script>renderAppHeader('page-id');</script> を置く
  *
  * page-id 一覧:
- *   'dashboard' | 'connections' | 'explorer' | 'query' | 'data-browser' | 'api-log'
+ *   'dashboard' | 'connections' | 'explorer' | 'query' | 'data-browser' | 'api-log' | 'ai-assistant' | 'settings'
  */
 (function () {
   const NAV_ITEMS = [
@@ -13,6 +13,8 @@
     { id: 'query',        label: 'クエリ',             href: '/query' },
     { id: 'data-browser', label: 'データブラウザ',     href: '/data-browser' },
     { id: 'api-log',      label: 'API ログ',           href: '/api-log' },
+    { id: 'ai-assistant', label: 'AI アシスタント',    href: '/ai-assistant' },
+    { id: 'settings',     label: '設定',               href: '/settings' },
   ];
 
   window.renderAppHeader = function (currentPage) {

@@ -8,3 +8,4 @@ from . import metadata     # noqa: E402, F401
 from . import query        # noqa: E402, F401
 from . import data         # noqa: E402, F401
 from . import api_log      # noqa: E402, F401
+from . import settings     # noqa: E402, F401
