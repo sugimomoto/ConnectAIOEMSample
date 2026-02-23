@@ -1,7 +1,7 @@
 # リポジトリ構造定義書: DataHub - Connect AI OEM リファレンス実装
 
-**バージョン**: 1.0
-**最終更新**: 2026-02-22
+**バージョン**: 1.1
+**最終更新**: 2026-02-23
 
 ---
 
@@ -11,10 +11,11 @@
 2. [ルートディレクトリ](#2-ルートディレクトリ)
 3. [backend/](#3-backend)
 4. [frontend/](#4-frontend)
-5. [docs/](#5-docs)
-6. [.steering/](#6-steering)
-7. [ファイル配置ルール](#7-ファイル配置ルール)
-8. [命名規則](#8-命名規則)
+5. [migrations/](#5-migrations)
+6. [docs/](#6-docs)
+7. [.steering/](#7-steering)
+8. [ファイル配置ルール](#8-ファイル配置ルール)
+9. [命名規則](#9-命名規則)
 
 ---
 
@@ -23,10 +24,10 @@
 ```
 ConnectAIOEMSample/                     # リポジトリルート
 ├── backend/                            # Pythonバックエンド
-├── frontend/                           # HTML/CSS/JSフロントエンド
+├── frontend/                           # HTML/JSフロントエンド
+├── migrations/                         # Alembicマイグレーション
 ├── docs/                               # 永続的ドキュメント
 ├── .steering/                          # 作業単位のドキュメント
-├── .env.example                        # 環境変数のサンプル（コミット対象）
 ├── .gitignore                          # Git除外設定
 ├── CLAUDE.md                           # AI開発ガイド（プロジェクトメモリ）
 └── README.md                           # プロジェクト説明
@@ -39,11 +40,10 @@ ConnectAIOEMSample/                     # リポジトリルート
 | ファイル/ディレクトリ | 役割 | コミット |
 |----------------------|------|---------|
 | `backend/` | Flaskアプリケーション本体 | ✓ |
-| `frontend/` | HTML/JS/CSSファイル群 | ✓ |
+| `frontend/` | HTML/JSファイル群 | ✓ |
+| `migrations/` | Alembicマイグレーションスクリプト | ✓ |
 | `docs/` | 永続的なプロジェクトドキュメント | ✓ |
 | `.steering/` | 作業単位の設計・タスクドキュメント | ✓ |
-| `.env.example` | 環境変数のテンプレート（実値なし） | ✓ |
-| `.env` | 実際の環境変数（秘密情報を含む） | **✗ gitignore** |
 | `.gitignore` | Git管理対象外の定義 | ✓ |
 | `CLAUDE.md` | Claude Code向け開発ガイドライン | ✓ |
 | `README.md` | セットアップ手順、プロジェクト概要 | ✓ |
@@ -57,22 +57,25 @@ Flaskアプリケーションのすべてのコードを格納します。
 ```
 backend/
 ├── app.py                              # アプリケーションエントリーポイント
-├── config.py                           # 環境別設定クラス
+├── config.py                           # 環境別設定クラス（パス解決含む）
 ├── models/                             # SQLAlchemyモデル
 │   ├── __init__.py                     # DBインスタンス生成・モデルのエクスポート
 │   ├── user.py                         # Userモデル
-│   └── connection.py                   # Connectionモデル
+│   └── api_log.py                      # ApiLogモデル（Phase 3）
 ├── schemas/                            # Pydanticスキーマ（リクエスト/レスポンス検証）
 │   ├── __init__.py
 │   ├── user_schema.py                  # ユーザー登録・ログインのスキーマ
 │   ├── connection_schema.py            # コネクション作成のスキーマ
-│   └── query_schema.py                 # クエリ実行のスキーマ
+│   ├── query_schema.py                 # クエリ実行のスキーマ
+│   └── data_schema.py                  # データCRUDのスキーマ
 ├── services/                           # ビジネスロジック層
 │   ├── __init__.py
 │   ├── auth_service.py                 # 認証・Connect AI Account API
 │   ├── connection_service.py           # コネクション管理・Connection API
 │   ├── metadata_service.py             # Metadata API呼び出し
-│   └── query_service.py                # SQL API呼び出し
+│   ├── query_service.py                # SQL API呼び出し（クエリ実行）
+│   ├── data_service.py                 # データCRUD操作
+│   └── api_log_service.py              # API ログ取得
 ├── connectai/                          # Connect AI APIクライアント
 │   ├── __init__.py
 │   ├── client.py                       # HTTP APIクライアント（requests）
@@ -85,25 +88,27 @@ backend/
 │       ├── auth.py                     # POST /api/v1/auth/*
 │       ├── connections.py              # /api/v1/connections/*
 │       ├── metadata.py                 # GET /api/v1/metadata/*
-│       └── queries.py                  # POST /api/v1/queries/*
+│       ├── query.py                    # POST /api/v1/query/*
+│       ├── data.py                     # /api/v1/data/*
+│       └── api_log.py                  # GET/DELETE /api/v1/api-logs
 ├── middleware/                         # リクエスト前処理
 │   ├── __init__.py
-│   ├── auth.py                         # JWT検証デコレータ（@require_auth）
 │   └── error_handler.py                # グローバルエラーハンドラー
-├── migrations/                         # Alembicマイグレーション
-│   ├── alembic.ini
-│   ├── env.py
-│   └── versions/                       # マイグレーションスクリプト
+├── keys/                               # RSA鍵ペア格納ディレクトリ
+│   ├── private.key                     # RSA秘密鍵（gitignore対象）
+│   ├── public.key                      # RSA公開鍵（gitignore対象）
+│   └── README.md                       # 鍵管理手順
 ├── tests/                              # ユニット・インテグレーションテスト
 │   ├── __init__.py
 │   ├── conftest.py                     # pytestの共通フィクスチャ
 │   ├── test_auth.py                    # 認証APIのテスト
 │   ├── test_connections.py             # コネクションAPIのテスト
 │   ├── test_metadata.py                # メタデータAPIのテスト
-│   └── test_queries.py                 # クエリAPIのテスト
-├── requirements.txt                    # 本番依存パッケージ
-├── requirements-dev.txt                # 開発用依存パッケージ（pytest等）
-└── .env.example                        # バックエンド環境変数テンプレート
+│   ├── test_query.py                   # クエリAPIのテスト
+│   ├── test_data.py                    # データCRUD APIのテスト
+│   └── test_api_log.py                 # API ログAPIのテスト（Phase 3）
+├── requirements.txt                    # 依存パッケージ（pytest含む）
+└── .env                                # 環境変数（gitignore対象）
 ```
 
 ### 3.1 各ディレクトリの役割
@@ -112,6 +117,7 @@ backend/
 - Flaskアプリケーションの生成・初期化
 - Blueprintの登録
 - フロントエンドの静的ファイル・HTMLテンプレートの提供
+- Flask-Login の初期化
 
 ```python
 # 静的ファイルとテンプレートの設定例
@@ -124,11 +130,13 @@ app = Flask(
 
 #### backend/config.py
 - 環境変数の読み込みと設定クラスの定義
-- `DevelopmentConfig`（DEBUG=True）のみ定義（デモ用途のため）
+- `_PROJECT_ROOT = Path(__file__).resolve().parent.parent` でプロジェクトルートを特定
+- `_resolve_path()` で `CONNECT_AI_PRIVATE_KEY_PATH` を絶対パスに変換（起動ディレクトリに依存しない）
 
 #### backend/models/
 - SQLAlchemyモデルクラスを1ファイルにつき1モデルで定義
 - `__init__.py` で `db = SQLAlchemy()` インスタンスを生成し、各モデルをインポート
+- **注意**: `Connection` モデルは存在しません（コネクション情報はConnect AI側で管理）
 
 #### backend/schemas/
 - Pydanticモデルによるリクエスト/レスポンスのバリデーション
@@ -141,8 +149,8 @@ app = Flask(
 
 #### backend/connectai/
 - CData Connect AI APIとの通信を担当するモジュール
-- `client.py`: HTTP APIクライアント（`requests`ライブラリを使用）
-- `jwt.py`: RS256署名のJWTトークン生成
+- `client.py`: HTTP APIクライアント（`requests`ライブラリを使用）。全 API 呼び出し結果を非同期で `ApiLog` に記録
+- `jwt.py`: RS256署名のJWTトークン生成（秘密鍵ファイルを読み込み）
 - `exceptions.py`: APIエラーを表すカスタム例外
 
 #### backend/api/v1/
@@ -150,8 +158,11 @@ app = Flask(
 - HTTP層のみ（リクエスト/レスポンスの処理）。ビジネスロジックはservices/に委譲
 
 #### backend/middleware/
-- `auth.py`: `@require_auth` デコレータ（JWTトークン検証）
 - `error_handler.py`: 未処理の例外をJSONエラーレスポンスに変換
+
+#### backend/keys/
+- RSA鍵ペアの格納ディレクトリ
+- `private.key`、`public.key` はいずれも `.gitignore` により Git 管理対象外
 
 ---
 
@@ -167,23 +178,17 @@ frontend/
 │   ├── register.html                   # ユーザー登録画面
 │   ├── dashboard.html                  # ダッシュボード
 │   ├── connections.html                # コネクション管理画面
+│   ├── connections-new.html            # コネクション作成画面
+│   ├── callback.html                   # コネクション認証コールバック画面
 │   ├── explorer.html                   # メタデータエクスプローラー
-│   ├── query-builder.html              # クエリビルダー
+│   ├── query.html                      # クエリビルダー
 │   ├── data-browser.html               # データブラウザ（CRUD）
-│   └── callback.html                   # コネクション認証コールバック画面
+│   └── api-log.html                    # API ログ閲覧画面（Phase 3）
 └── static/                             # 静的ファイル（/static/ でアクセス可能）
-    ├── css/
-    │   └── custom.css                  # カスタムスタイル（Tailwind補完用）
-    ├── js/
-    │   ├── api-client.js               # バックエンドAPIとの通信クラス
-    │   ├── auth.js                     # 認証処理（ログイン/ログアウト/JWT管理）
-    │   ├── connections.js              # コネクション管理UI
-    │   ├── explorer.js                 # メタデータエクスプローラーUI
-    │   ├── query-builder.js            # クエリビルダーUI
-    │   ├── data-browser.js             # データブラウザUI（CRUD操作）
-    │   └── utils.js                    # 共通ユーティリティ関数
-    └── img/
-        └── logo.svg                    # ロゴ画像
+    └── js/
+        ├── api-client.js               # バックエンドAPIとの通信クラス
+        ├── auth.js                     # ログアウト処理（logout() 関数定義）
+        └── header.js                   # 共通ヘッダーコンポーネント（Phase 3）
 ```
 
 ### 4.1 各ファイルの役割
@@ -191,23 +196,40 @@ frontend/
 #### frontend/pages/
 - 各画面のHTMLファイル
 - Tailwind CSS・Alpine.jsはCDN経由で読み込む（ビルド不要）
-- `<script src="/static/js/xxx.js">` でJavaScriptを読み込む
-
-#### frontend/static/css/
-- `custom.css`: Tailwindのユーティリティで表現できないカスタムスタイルのみ記述
+- Alpine.jsのリアクティブ状態はHTMLインライン（`x-data`）で管理
+- 保護ページは `<head>` 内で `header.js` を読み込み、`renderAppHeader('page-id')` を呼び出す
 
 #### frontend/static/js/
-- 各JSファイルは対応するHTMLページで読み込む
-- `api-client.js` は全ページで共通使用
-- `auth.js` は認証状態の確認・管理を担当し、全保護ページで読み込む
+- **`api-client.js`**: 全ページで共通使用する `APIClient` クラス。Cookie セッション認証前提
+- **`auth.js`**: `logout()` グローバル関数を定義。全保護ページで読み込む
+- **`header.js`**: `renderAppHeader(currentPage)` グローバル関数を定義。Alpine.js の defer より前に同期読み込みする
 
-#### frontend/static/img/
-- SVG形式を優先（スケーラブル、軽量）
-- PNG形式はアイコンやロゴの代替形式として使用
+> **注意**: CSS ファイル（`custom.css`）、画像ファイル（`logo.svg`）、ページ個別の JS ファイルは存在しません。スタイルはすべて Tailwind CSS ユーティリティクラスで記述しています。
 
 ---
 
-## 5. docs/
+## 5. migrations/
+
+Alembicマイグレーションスクリプトを格納します。**プロジェクトルートに配置します**（`backend/` 内ではありません）。
+
+```
+migrations/
+├── alembic.ini                         # Alembic設定
+├── env.py                              # マイグレーション実行環境設定
+└── versions/                           # マイグレーションスクリプト
+    └── *.py                            # 各バージョンのスクリプト
+```
+
+**マイグレーション実行コマンド:**
+```bash
+# プロジェクトルートから実行
+PYTHONPATH=$(pwd) flask --app backend.app db upgrade
+PYTHONPATH=$(pwd) flask --app backend.app db migrate -m "migration name"
+```
+
+---
+
+## 6. docs/
 
 アプリケーション全体の設計を定義する永続的なドキュメント。
 
@@ -218,20 +240,10 @@ docs/
 ├── architecture.md                     # 技術仕様書
 ├── repository-structure.md             # リポジトリ構造定義書（本ドキュメント）
 ├── development-guidelines.md           # 開発ガイドライン
-├── glossary.md                         # ユビキタス言語定義
-└── api/                                # CData Connect AI APIリファレンス
-    ├── README.md                       # APIリファレンス目次
-    ├── overview.md                     # API概要
-    ├── authentication.md               # 認証方式
-    ├── rest-api-basics.md              # REST APIの基本仕様
-    ├── account-api.md                  # Account API
-    ├── connection-api.md               # Connection API
-    ├── audit-api.md                    # Audit API
-    ├── metadata-api.md                 # Metadata API
-    └── sql-api.md                      # SQL API
+└── glossary.md                         # ユビキタス言語定義
 ```
 
-### 5.1 ドキュメントの更新方針
+### 6.1 ドキュメントの更新方針
 
 | ドキュメント | 更新タイミング |
 |-------------|-------------|
@@ -241,41 +253,56 @@ docs/
 | `repository-structure.md` | フォルダ・ファイル構成が変わった場合 |
 | `development-guidelines.md` | コーディング規約・開発フローが変わった場合 |
 | `glossary.md` | 新しい用語・概念が登場した場合 |
-| `api/` 配下 | Connect AI APIの仕様が更新された場合 |
 
 ---
 
-## 6. .steering/
+## 7. .steering/
 
 特定の開発作業における設計・タスクドキュメント。
 作業ごとに新しいディレクトリを作成し、完了後も履歴として保持します。
 
 ```
 .steering/
-├── 20260217-initial-implementation/    # 初回実装（例）
-│   ├── requirements.md                 # 今回の作業の要求内容
-│   ├── design.md                       # 変更内容の設計
-│   └── tasklist.md                     # タスクリストと進捗
-└── 20260301-add-saved-queries/         # 保存クエリ機能追加（例）
+├── 20260222-phase1-01-auth/            # Phase 1-01: 認証機能
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+├── 20260222-phase1-02-connections/     # Phase 1-02: コネクション管理
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+├── 20260223-phase1-03-metadata-explorer/ # Phase 1-03: メタデータエクスプローラー
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+├── 20260223-phase2-01-query-builder/   # Phase 2-01: クエリビルダー
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+├── 20260223-phase2-02-crud/            # Phase 2-02: データCRUD操作
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+└── 20260223-phase3-01-api-log/         # Phase 3-01: API ログ
     ├── requirements.md
     ├── design.md
     └── tasklist.md
 ```
 
-### 6.1 命名規則
+### 7.1 命名規則
 
 ```
 .steering/[YYYYMMDD]-[開発タイトル]/
 ```
 
 - `YYYYMMDD`: 作業開始日付
-- `開発タイトル`: 英小文字とハイフンのみ使用（例: `add-saved-queries`, `fix-auth-bug`）
+- `開発タイトル`: 英小文字とハイフンのみ使用（例: `add-api-log`, `fix-auth-bug`）
 
 ---
 
-## 7. ファイル配置ルール
+## 8. ファイル配置ルール
 
-### 7.1 新機能追加時の配置
+### 8.1 新機能追加時の配置
 
 新しい機能を追加する場合、以下の場所にファイルを配置します。
 
@@ -284,22 +311,26 @@ docs/
 | 新しいDBテーブル | `backend/models/` に新ファイル追加 |
 | 新しいAPIエンドポイント群 | `backend/api/v1/` に新ファイル追加 + `backend/api/v1/__init__.py` に Blueprint登録 |
 | 新しいビジネスロジック | `backend/services/` に新ファイル追加 |
-| 新しい画面 | `frontend/pages/` にHTML追加 + `frontend/static/js/` にJS追加 |
-| DBスキーマ変更 | `backend/migrations/versions/` にAlembicマイグレーションを自動生成 |
+| 新しいリクエスト/レスポンスのスキーマ | `backend/schemas/` に新ファイル追加 |
+| 新しい画面 | `frontend/pages/` にHTML追加 |
+| DBスキーマ変更 | `flask db migrate` でマイグレーションを自動生成（プロジェクトルートから実行） |
 
-### 7.2 禁止事項
+### 8.2 禁止事項
 
 - `backend/api/v1/` にビジネスロジックを直接記述しない（必ずservicesに委譲）
-- `frontend/pages/` にインラインのビジネスロジックを大量に記述しない（`static/js/` に分離）
+- `frontend/pages/` にページ個別の大量なビジネスロジックJSファイルを作成しない（Alpine.jsインラインで管理）
 - `docs/` 配下に実装コードを含めない
-- `.env` ファイルをGitにコミットしない
+- `backend/.env` ファイルをGitにコミットしない
+- `backend/keys/private.key`、`backend/keys/public.key` をGitにコミットしない
 
-### 7.3 .gitignore の対象
+### 8.3 .gitignore の対象
 
 ```
 # 秘密情報
-.env
-private.key
+backend/.env
+backend/keys/private.key
+backend/keys/public.key
+backend/keys/parent_account_id.txt
 
 # Python
 __pycache__/
@@ -322,44 +353,42 @@ Thumbs.db
 
 ---
 
-## 8. 命名規則
+## 9. 命名規則
 
-### 8.1 ファイル名
+### 9.1 ファイル名
 
 | 種別 | 規則 | 例 |
 |------|------|-----|
-| Pythonファイル | スネークケース | `auth_service.py`, `connection_schema.py` |
-| HTMLファイル | ケバブケース | `query-builder.html`, `data-browser.html` |
-| JavaScriptファイル | ケバブケース | `api-client.js`, `query-builder.js` |
-| CSSファイル | ケバブケース | `custom.css` |
-| ドキュメント（Markdown） | ケバブケース | `functional-design.md`, `rest-api-basics.md` |
+| Pythonファイル | スネークケース | `auth_service.py`, `api_log.py` |
+| HTMLファイル | ケバブケース | `api-log.html`, `data-browser.html` |
+| JavaScriptファイル | ケバブケース | `api-client.js`, `header.js` |
+| ドキュメント（Markdown） | ケバブケース | `functional-design.md` |
 
-### 8.2 Pythonコード
+### 9.2 Pythonコード
 
 | 種別 | 規則 | 例 |
 |------|------|-----|
 | クラス名 | パスカルケース | `AuthService`, `ConnectAIClient` |
 | メソッド・関数名 | スネークケース | `register_user()`, `get_catalogs()` |
 | 変数名 | スネークケース | `user_id`, `connect_ai_account_id` |
-| 定数名 | 大文字スネークケース | `MAX_RETRY_COUNT`, `DEFAULT_TIMEOUT` |
-| モジュール名 | スネークケース | `auth_service`, `connection_service` |
+| 定数名 | 大文字スネークケース | `_TYPE_NAME_TO_DATA_TYPE` |
+| モジュール名 | スネークケース | `auth_service`, `api_log_service` |
 
-### 8.3 JavaScriptコード
-
-| 種別 | 規則 | 例 |
-|------|------|-----|
-| クラス名 | パスカルケース | `APIClient`, `AuthManager` |
-| メソッド・関数名 | キャメルケース | `executeQuery()`, `loadCatalogs()` |
-| 変数名 | キャメルケース | `connectionId`, `jwtToken` |
-| 定数名 | 大文字スネークケース | `API_BASE_URL`, `TOKEN_KEY` |
-
-### 8.4 データベース・API
+### 9.3 JavaScriptコード
 
 | 種別 | 規則 | 例 |
 |------|------|-----|
-| テーブル名 | スネークケース（複数形） | `users`, `connections`, `saved_queries` |
+| クラス名 | パスカルケース | `APIClient` |
+| メソッド・関数名 | キャメルケース | `executeQuery()`, `renderAppHeader()` |
+| 変数名 | キャメルケース | `connectionId`, `currentPage` |
+
+### 9.4 データベース・API
+
+| 種別 | 規則 | 例 |
+|------|------|-----|
+| テーブル名 | スネークケース（複数形） | `users`, `api_logs` |
 | カラム名 | スネークケース | `user_id`, `created_at`, `connect_ai_account_id` |
-| APIエンドポイント | ケバブケース | `/api/v1/connections`, `/api/v1/query-builder` |
+| APIエンドポイント | ケバブケース | `/api/v1/connections`, `/api/v1/api-logs` |
 | JSONフィールド（リクエスト/レスポンス） | スネークケース | `data_source`, `redirect_url` |
 
 ---
