@@ -1,6 +1,6 @@
 # リポジトリ構造定義書: DataHub - Connect AI OEM リファレンス実装
 
-**バージョン**: 1.1
+**バージョン**: 1.2
 **最終更新**: 2026-02-23
 
 ---
@@ -75,7 +75,10 @@ backend/
 │   ├── metadata_service.py             # Metadata API呼び出し
 │   ├── query_service.py                # SQL API呼び出し（クエリ実行）
 │   ├── data_service.py                 # データCRUD操作
-│   └── api_log_service.py              # API ログ取得
+│   ├── api_log_service.py              # API ログ取得
+│   ├── crypto_service.py               # Fernet暗号化ユーティリティ（Phase 4）
+│   ├── mcp_client.py                   # Connect AI MCP Streamable HTTP クライアント（Phase 4）
+│   └── claude_service.py               # Claude API + Agentic loop + SSE（Phase 4）
 ├── connectai/                          # Connect AI APIクライアント
 │   ├── __init__.py
 │   ├── client.py                       # HTTP APIクライアント（requests）
@@ -90,7 +93,9 @@ backend/
 │       ├── metadata.py                 # GET /api/v1/metadata/*
 │       ├── query.py                    # POST /api/v1/query/*
 │       ├── data.py                     # /api/v1/data/*
-│       └── api_log.py                  # GET/DELETE /api/v1/api-logs
+│       ├── api_log.py                  # GET/DELETE /api/v1/api-logs
+│       ├── settings.py                 # GET|POST|DELETE /api/v1/settings/api-key（Phase 4）
+│       └── ai_assistant.py             # GET|POST /api/v1/ai-assistant/*（Phase 4）
 ├── middleware/                         # リクエスト前処理
 │   ├── __init__.py
 │   └── error_handler.py                # グローバルエラーハンドラー
@@ -183,7 +188,9 @@ frontend/
 │   ├── explorer.html                   # メタデータエクスプローラー
 │   ├── query.html                      # クエリビルダー
 │   ├── data-browser.html               # データブラウザ（CRUD）
-│   └── api-log.html                    # API ログ閲覧画面（Phase 3）
+│   ├── api-log.html                    # API ログ閲覧画面（Phase 3）
+│   ├── settings.html                   # Claude API Key 設定画面（Phase 4）
+│   └── ai-assistant.html               # AI アシスタントチャット画面（Phase 4）
 └── static/                             # 静的ファイル（/static/ でアクセス可能）
     └── js/
         ├── api-client.js               # バックエンドAPIとの通信クラス
@@ -240,7 +247,18 @@ docs/
 ├── architecture.md                     # 技術仕様書
 ├── repository-structure.md             # リポジトリ構造定義書（本ドキュメント）
 ├── development-guidelines.md           # 開発ガイドライン
-└── glossary.md                         # ユビキタス言語定義
+├── glossary.md                         # ユビキタス言語定義
+└── api/                                # Connect AI API リファレンス
+    ├── README.md                       # API ドキュメント目次
+    ├── overview.md                     # API 概要
+    ├── authentication.md               # 認証仕様
+    ├── rest-api-basics.md              # REST API 基本仕様
+    ├── account-api.md                  # アカウント API
+    ├── connection-api.md               # コネクション API
+    ├── audit-api.md                    # 監査 API
+    ├── metadata-api.md                 # メタデータ API
+    ├── sql-api.md                      # SQL API
+    └── mcp-api.md                      # MCP API（Streamable HTTP）Phase 4
 ```
 
 ### 6.1 ドキュメントの更新方針
@@ -283,9 +301,25 @@ docs/
 │   ├── requirements.md
 │   ├── design.md
 │   └── tasklist.md
-└── 20260223-phase3-01-api-log/         # Phase 3-01: API ログ
-    ├── requirements.md
-    ├── design.md
+├── 20260223-phase3-01-api-log/         # Phase 3-01: API ログ
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md
+├── 20260223-ai-assistant/              # Phase 4: AI アシスタント（共通ドキュメント・インデックス）
+│   ├── requirements.md
+│   ├── design.md
+│   └── tasklist.md                     # フェーズ一覧インデックス
+├── 20260223-phase4-01-infrastructure/  # Phase 4-01: 基盤整備（API Key 管理）
+│   └── tasklist.md
+├── 20260223-phase4-02-mcp-client/      # Phase 4-02: MCP クライアント
+│   └── tasklist.md
+├── 20260223-phase4-03-chat-basic/      # Phase 4-03: チャット基本動作
+│   └── tasklist.md
+├── 20260223-phase4-04-streaming/       # Phase 4-04: SSE ストリーミング
+│   └── tasklist.md
+├── 20260223-phase4-05-tool-visibility/ # Phase 4-05: MCP ツール呼び出し可視化
+│   └── tasklist.md
+└── 20260223-phase4-06-conversation/    # Phase 4-06: 会話コンテキスト保持
     └── tasklist.md
 ```
 
@@ -314,6 +348,8 @@ docs/
 | 新しいリクエスト/レスポンスのスキーマ | `backend/schemas/` に新ファイル追加 |
 | 新しい画面 | `frontend/pages/` にHTML追加 |
 | DBスキーマ変更 | `flask db migrate` でマイグレーションを自動生成（プロジェクトルートから実行） |
+| Claude API Key の保存 | `backend/services/crypto_service.py` の Fernet 暗号化を必ず使用する |
+| MCP 呼び出し | `backend/services/mcp_client.py` を経由する（API ルートから直接 HTTP リクエストしない） |
 
 ### 8.2 禁止事項
 

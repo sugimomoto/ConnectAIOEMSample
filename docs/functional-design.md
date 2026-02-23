@@ -1,8 +1,8 @@
 # 機能設計書: DataHub - Connect AI OEM リファレンス実装
 
-**バージョン**: 1.1
+**バージョン**: 1.2
 **最終更新**: 2026-02-23
-**対象フェーズ**: Phase 1-3 (MVP + クエリ・CRUD機能 + API ログ)
+**対象フェーズ**: Phase 1-4 (MVP + クエリ・CRUD機能 + API ログ + AI アシスタント)
 
 ---
 
@@ -99,11 +99,16 @@ graph TB
         QuerySvc[Query Service]
         DataSvc[Data Service]
         LogSvc[API Log Service]
+        AISvc[Claude Service<br/>Phase 4]
+        MCPClient[MCP Client<br/>Phase 4]
+        CryptoSvc[Crypto Service<br/>Phase 4]
         DB[(SQLite)]
     end
 
     subgraph "External Services"
-        ConnectAI[CData Connect AI<br/>Embedded Cloud]
+        ConnectAI[CData Connect AI<br/>Embedded Cloud<br/>REST API]
+        ConnectAIMCP[CData Connect AI<br/>MCP Server<br/>Streamable HTTP]
+        ClaudeAPI[Claude API<br/>Anthropic]
         SF[Salesforce]
         QB[QuickBooks]
         ADO[Azure DevOps]
@@ -124,10 +129,17 @@ graph TB
     MetaSvc --> ConnectAI
     QuerySvc --> ConnectAI
     DataSvc --> ConnectAI
+    MCPClient --> ConnectAIMCP
+
+    AISvc --> ClaudeAPI
+    AISvc --> MCPClient
 
     ConnectAI --> SF
     ConnectAI --> QB
     ConnectAI --> ADO
+    ConnectAIMCP --> SF
+    ConnectAIMCP --> QB
+    ConnectAIMCP --> ADO
 ```
 
 ### 2.2 認証フロー
@@ -262,6 +274,7 @@ erDiagram
         string password_hash "bcryptでハッシュ化"
         string name "ユーザー名"
         string connect_ai_account_id "Connect AIのaccountId"
+        text claude_api_key_encrypted "Claude API Key（Fernet暗号化）Phase 4"
         datetime created_at
         datetime updated_at
     }
@@ -292,6 +305,7 @@ erDiagram
 | password_hash | VARCHAR(255) | NO | - | - | bcryptハッシュ |
 | name | VARCHAR(100) | NO | - | - | ユーザー名 |
 | connect_ai_account_id | VARCHAR(255) | YES | NULL | - | Connect AIのaccountId |
+| claude_api_key_encrypted | TEXT | YES | NULL | - | Claude API Key（Fernet暗号化）Phase 4 |
 | created_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | - | 作成日時 |
 | updated_at | TIMESTAMP | NO | CURRENT_TIMESTAMP | ON UPDATE | 更新日時 |
 
@@ -381,7 +395,37 @@ erDiagram
 - `get_logs(user_id, limit)` → list[ApiLog]
   - 最新のAPIログ一覧取得
 
-#### 4.1.7 Connect AI HTTP APIクライアント (connectai/client.py)
+#### 4.1.7 暗号化ユーティリティ (services/crypto_service.py)（Phase 4）
+
+**責務**: Claude API Key の暗号化・復号
+
+- `encrypt(plain_text)` → str — Fernet で暗号化してBase64文字列を返す
+- `decrypt(encrypted_text)` → str — 暗号化済み文字列を復号して返す
+- 暗号化キーは環境変数 `ENCRYPTION_KEY` から取得
+
+#### 4.1.8 MCP クライアント (services/mcp_client.py)（Phase 4）
+
+**責務**: CData Connect AI MCP サーバーへの Streamable HTTP 接続
+
+- `get_catalogs(jwt_token)` → dict
+- `get_schemas(jwt_token, catalog_name)` → dict
+- `get_tables(jwt_token, catalog_name, schema_name)` → dict
+- `get_columns(jwt_token, catalog_name, schema_name, table_name)` → dict
+- `query_data(jwt_token, query, parameters=None)` → dict
+- 各メソッドが `Authorization: Bearer {jwt_token}` ヘッダーで MCP サーバーに接続
+
+#### 4.1.9 Claude サービス (services/claude_service.py)（Phase 4）
+
+**責務**: Claude API 呼び出しと MCP Agentic loop の実行
+
+- `chat(user_message, messages, claude_api_key, jwt_token, catalog_name=None)` → generator
+  - ユーザーの Claude API Key で Anthropic SDK を初期化
+  - MCP ツール定義を `tools` パラメータとして渡す
+  - Claude がツール呼び出しを返した場合、`mcp_client` を呼び出して結果を返す（Agentic loop）
+  - SSE 形式で最終回答をストリーミング yield する
+  - ツール呼び出し情報（名前・引数・結果サマリー）も SSE イベントとして yield する
+
+#### 4.1.10 Connect AI HTTP APIクライアント (connectai/client.py)
 
 **責務**: Connect AI API との HTTP 通信
 
@@ -493,6 +537,8 @@ graph TD
     Dashboard --> Query[クエリビルダー]
     Dashboard --> DataBrowser[データブラウザ]
     Dashboard --> ApiLog[API ログ]
+    Dashboard --> AIAssistant[AI アシスタント Phase 4]
+    Dashboard --> Settings[設定 Phase 4]
 
     Connections -->|新規作成| ConnNew[コネクション作成フォーム]
     ConnNew -->|Connect AI 認証| Callback[コールバック画面]
@@ -507,6 +553,12 @@ graph TD
     DataBrowser -->|レコード作成・編集・削除| DataBrowser
 
     ApiLog -->|ログクリア| ApiLog
+
+    AIAssistant -->|カタログ選択・質問送信| AIAssistant
+    AIAssistant -->|新しい会話| AIAssistant
+    AIAssistant -->|APIキー未設定| Settings
+
+    Settings -->|APIキー保存| Settings
 
     Dashboard -->|ログアウト| Login
 ```
@@ -525,6 +577,8 @@ graph TD
 | クエリビルダー | `/query` | SQL入力・実行・結果表示 | 必要 |
 | データブラウザ | `/data-browser` | レコード一覧、CRUD操作 | 必要 |
 | API ログ | `/api-log` | Connect AI API 呼び出し履歴 | 必要 |
+| AI アシスタント | `/ai-assistant` | 自然言語チャット・カタログ動的選択（Phase 4） | 必要 |
+| 設定 | `/settings` | Claude API Key 管理（Phase 4） | 必要 |
 
 ---
 
@@ -582,6 +636,34 @@ graph TD
 |---------|--------------|------|----------|----------|
 | GET | `/api/v1/api-logs` | APIログ一覧取得 | クエリパラメータ: `limit?` | `{logs: [...]}` |
 | DELETE | `/api/v1/api-logs` | APIログ全削除 | - | `{message}` |
+
+#### 6.1.7 設定 API（Phase 4）
+
+| メソッド | エンドポイント | 説明 | リクエスト | レスポンス |
+|---------|--------------|------|----------|----------|
+| GET | `/api/v1/settings/api-key` | APIキー設定状態取得 | - | `{is_set: bool}` |
+| POST | `/api/v1/settings/api-key` | APIキー保存 | `{api_key}` | `{message}` |
+| DELETE | `/api/v1/settings/api-key` | APIキー削除 | - | `{message}` |
+
+#### 6.1.8 AI アシスタント API（Phase 4）
+
+| メソッド | エンドポイント | 説明 | リクエスト | レスポンス |
+|---------|--------------|------|----------|----------|
+| GET | `/ai-assistant` | チャット画面レンダリング | - | HTML |
+| POST | `/api/v1/ai-assistant/chat` | チャットメッセージ送信（SSE） | `{message, catalog_name?}` | `text/event-stream` |
+| POST | `/api/v1/ai-assistant/reset` | 会話リセット | - | `{message}` |
+
+**SSE イベント形式:**
+```
+event: text
+data: {"chunk": "回答テキストの断片..."}
+
+event: tool_call
+data: {"name": "getTables", "input": {...}, "summary": "..."}
+
+event: done
+data: {}
+```
 
 ### 6.2 クエリ実行 API 詳細
 
