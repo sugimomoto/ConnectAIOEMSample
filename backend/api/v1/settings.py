@@ -27,7 +27,11 @@ def save_api_key():
     if not api_key.startswith("sk-ant-"):
         return jsonify({"error": {"code": "VALIDATION_ERROR", "message": "有効な Claude API Key を入力してください（sk-ant- から始まる形式）"}}), 400
 
-    current_user.claude_api_key_encrypted = crypto_service.encrypt(api_key)
+    try:
+        current_user.claude_api_key_encrypted = crypto_service.encrypt(api_key)
+    except RuntimeError as e:
+        return jsonify({"error": {"code": "SERVER_MISCONFIGURATION", "message": str(e)}}), 500
+
     db.session.commit()
 
     return jsonify({"message": "API Key を保存しました"}), 200

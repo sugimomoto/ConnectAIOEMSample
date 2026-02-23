@@ -67,6 +67,11 @@ CONNECT_AI_PARENT_ACCOUNT_ID=あなたの親アカウントID
 # RSA 秘密鍵（ファイル配置が不要な環境変数方式を推奨）
 # 改行を \n でエスケープして1行で記載してください
 CONNECT_AI_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----"
+
+# Claude API Key 暗号化キー（AI アシスタント機能を使用する場合に必要）
+# 以下のコマンドで生成してください
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=生成した Fernet キーを貼り付けてください
 ```
 
 > **Codespaces を使う場合の Tip:** リポジトリの **Settings → Secrets and variables → Codespaces** に `CONNECT_AI_PRIVATE_KEY` などを登録しておくと、`.env` を手動編集しなくても自動的に環境変数として利用できます。
@@ -136,6 +141,11 @@ CONNECT_AI_PRIVATE_KEY_PATH=backend/keys/private.key
 
 # アプリのベース URL（OAuth コールバック URL の組み立てに使用）
 APP_BASE_URL=http://localhost:5001
+
+# Claude API Key 暗号化キー（AI アシスタント機能を使用する場合に必要）
+# 以下のコマンドで生成してください
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=生成した Fernet キーを貼り付けてください
 ```
 
 #### 6. データベースを初期化する
