@@ -265,3 +265,43 @@ class TestAiAssistantClientHistory:
         _register_and_login(client)
         resp = client.post("/api/v1/ai-assistant/reset")
         assert resp.status_code == 200
+
+    def test_two_users_histories_do_not_mix(self, app):
+        """クライアントサイド履歴のため、サーバーは各ユーザーの送信内容のみを処理する。"""
+        client_a = app.test_client()
+        client_b = app.test_client()
+        _register_and_login(client_a, email="a@example.com")
+        _register_and_login(client_b, email="b@example.com")
+        _set_api_key(app, email="a@example.com")
+        _set_api_key(app, email="b@example.com")
+
+        received_by_a = {}
+        received_by_b = {}
+
+        def mock_stream_a(api_key, jwt_token, messages, catalog_name=None):
+            received_by_a["messages"] = list(messages)
+            yield "done", {"message": "complete", "answer": "回答A"}
+
+        def mock_stream_b(api_key, jwt_token, messages, catalog_name=None):
+            received_by_b["messages"] = list(messages)
+            yield "done", {"message": "complete", "answer": "回答B"}
+
+        with patch("backend.api.v1.ai_assistant.generate_connect_ai_jwt", return_value="tok"), \
+             patch("backend.services.claude_service.stream_chat", side_effect=mock_stream_a):
+            client_a.post("/api/v1/ai-assistant/chat", json={
+                "message": "AのQ2",
+                "messages": [{"role": "user", "content": "AのQ1"}, {"role": "assistant", "content": "AのA1"}],
+            })
+
+        with patch("backend.api.v1.ai_assistant.generate_connect_ai_jwt", return_value="tok"), \
+             patch("backend.services.claude_service.stream_chat", side_effect=mock_stream_b):
+            client_b.post("/api/v1/ai-assistant/chat", json={
+                "message": "BのQ1",
+            })
+
+        # ユーザー A の履歴には A のメッセージのみ含まれる
+        assert len(received_by_a["messages"]) == 3
+        assert all("A" in m["content"] for m in received_by_a["messages"])
+        # ユーザー B の履歴には B のメッセージのみ含まれる
+        assert len(received_by_b["messages"]) == 1
+        assert received_by_b["messages"][0]["content"] == "BのQ1"
