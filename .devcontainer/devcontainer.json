@@ -1,0 +1,24 @@
+{
+  "name": "ConnectAIOEMSample",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "forwardPorts": [5001],
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "remoteEnv": {
+    "PYTHONPATH": "${containerWorkspaceFolder}"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.pylance",
+        "ms-python.debugpy"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["backend/tests"],
+        "python.testing.cwd": "${workspaceFolder}"
+      }
+    }
+  }
+}

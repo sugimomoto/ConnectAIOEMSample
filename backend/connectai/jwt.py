@@ -16,9 +16,15 @@ def generate_connect_ai_jwt(parent_account_id: str, subject_account_id: str) -> 
     Returns:
         署名済み JWT 文字列
     """
-    private_key_path = current_app.config["CONNECT_AI_PRIVATE_KEY_PATH"]
-    with open(private_key_path, "rb") as f:
-        private_key = serialization.load_pem_private_key(f.read(), password=None)
+    private_key_content = current_app.config.get("CONNECT_AI_PRIVATE_KEY", "")
+    if private_key_content:
+        private_key = serialization.load_pem_private_key(
+            private_key_content.replace("\\n", "\n").encode(), password=None
+        )
+    else:
+        private_key_path = current_app.config["CONNECT_AI_PRIVATE_KEY_PATH"]
+        with open(private_key_path, "rb") as f:
+            private_key = serialization.load_pem_private_key(f.read(), password=None)
 
     now = int(time.time())
     payload = {
