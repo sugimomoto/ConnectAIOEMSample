@@ -11,6 +11,7 @@
 | **メタデータエクスプローラー** | カタログ → スキーマ → テーブル → カラムのドリルダウン閲覧 |
 | **クエリビルダー** | カラム選択・WHERE 条件・ページネーション・CSV エクスポートを備えたビジュアル SELECT クエリ |
 | **データブラウザー** | カラムメタデータから動的生成されたフォームによるレコードの一覧・作成・編集・削除 |
+| **AI アシスタント** | 自然言語でデータを問い合わせる MCP チャット。SSE でトークンをリアルタイム表示し、ツール呼び出し履歴をアコーディオン UI で可視化 |
 
 ---
 
@@ -67,6 +68,11 @@ CONNECT_AI_PARENT_ACCOUNT_ID=あなたの親アカウントID
 # RSA 秘密鍵（ファイル配置が不要な環境変数方式を推奨）
 # 改行を \n でエスケープして1行で記載してください
 CONNECT_AI_PRIVATE_KEY="-----BEGIN RSA PRIVATE KEY-----\nMIIEow...\n-----END RSA PRIVATE KEY-----"
+
+# Claude API Key 暗号化キー（AI アシスタント機能を使用する場合に必要）
+# 以下のコマンドで生成してください
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=生成した Fernet キーを貼り付けてください
 ```
 
 > **Codespaces を使う場合の Tip:** リポジトリの **Settings → Secrets and variables → Codespaces** に `CONNECT_AI_PRIVATE_KEY` などを登録しておくと、`.env` を手動編集しなくても自動的に環境変数として利用できます。
@@ -136,6 +142,11 @@ CONNECT_AI_PRIVATE_KEY_PATH=backend/keys/private.key
 
 # アプリのベース URL（OAuth コールバック URL の組み立てに使用）
 APP_BASE_URL=http://localhost:5001
+
+# Claude API Key 暗号化キー（AI アシスタント機能を使用する場合に必要）
+# 以下のコマンドで生成してください
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+ENCRYPTION_KEY=生成した Fernet キーを貼り付けてください
 ```
 
 #### 6. データベースを初期化する
@@ -166,6 +177,10 @@ python3 -m flask --app backend.app:create_app run --port 5001
 5. **メタデータエクスプローラー** でカタログ・スキーマ・テーブル・カラムを閲覧する
 6. **クエリビルダー** でビジュアルフィルターを使って SELECT クエリを実行する
 7. **データブラウザー** でレコードの閲覧・編集・削除を行う
+8. **設定** 画面から自分の Claude API Key を登録する
+9. **AI アシスタント** でカタログを選択して自然言語でデータを問い合わせる
+   - カタログ未選択でも AI が自律的にデータソースを探索して回答する
+   - 「新しい会話」ボタンで会話をリセットできる
 
 ---
 
@@ -202,12 +217,14 @@ pytest tests/
 ConnectAIOEMSample/
 ├── .devcontainer/       # DevContainer / GitHub Codespaces 設定
 ├── backend/
-│   ├── api/v1/          # Flask ルートハンドラー（auth, connections, metadata, query, data）
-│   ├── connectai/       # CData Connect AI API クライアント
-│   ├── models/          # SQLAlchemy モデル（User）
+│   ├── api/v1/          # Flask ルートハンドラー（auth, connections, metadata, query, data,
+│   │                    #   settings, ai_assistant）
+│   ├── connectai/       # CData Connect AI API クライアント・JWT 生成
+│   ├── models/          # SQLAlchemy モデル（User, ApiLog）
 │   ├── schemas/         # Pydantic リクエストバリデーションスキーマ
-│   ├── services/        # ビジネスロジック（ConnectionService, MetadataService など）
-│   ├── tests/           # pytest テストスイート
+│   ├── services/        # ビジネスロジック（ConnectionService, MetadataService,
+│   │                    #   crypto_service, mcp_client, claude_service など）
+│   ├── tests/           # pytest テストスイート（135 テスト）
 │   ├── keys/            # RSA 秘密鍵（バージョン管理対象外）
 │   ├── .env             # 環境変数（バージョン管理対象外）
 │   ├── .env.example     # 環境変数のテンプレート
@@ -230,6 +247,8 @@ ConnectAIOEMSample/
 | データベース | SQLite（開発環境）/ SQLAlchemy 対応の任意の DB |
 | フロントエンド | Alpine.js, Tailwind CSS（CDN 読み込み、ビルド不要） |
 | 認証 | bcrypt パスワードハッシュ化、Connect AI API 向け RS256 JWT |
+| AI アシスタント | Anthropic SDK (Claude API)、MCP Streamable HTTP クライアント、SSE ストリーミング |
+| 暗号化 | cryptography (Fernet) — Claude API Key を DB に暗号化保存 (`ENCRYPTION_KEY`) |
 | テスト | pytest, unittest.mock |
 
 ---

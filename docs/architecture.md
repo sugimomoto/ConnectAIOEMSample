@@ -1,6 +1,6 @@
 # 技術仕様書: DataHub - Connect AI OEM リファレンス実装
 
-**バージョン**: 1.1
+**バージョン**: 1.2
 **最終更新**: 2026-02-23
 
 ---
@@ -31,8 +31,9 @@
 | email-validator | 2.1.0 | メールアドレス検証 | Pydantic の EmailStr 型に必要 |
 | bcrypt | 4.1.2 | パスワードハッシュ化 | 業界標準のパスワードハッシュアルゴリズム |
 | PyJWT | 2.8.0 | JWT生成・検証 | Connect AI用JWT（RS256）の生成 |
-| cryptography | 41.0.7 | RSA署名 | Connect AI用JWT（RS256）の署名 |
-| requests | 2.31.0 | HTTPクライアント | Connect AI APIへのHTTP呼び出し |
+| cryptography | 41.0.7 | RSA署名 / Fernet暗号化 | Connect AI用JWT署名・Claude API Key の暗号化保存 |
+| requests | 2.31.0 | HTTPクライアント | Connect AI API / MCP サーバーへのHTTP呼び出し |
+| anthropic | 最新 | Claude API クライアント | AI アシスタント機能（Phase 4）|
 | python-dotenv | 1.0.0 | 環境変数管理 | .envファイルの読み込み |
 
 ### 1.2 Frontend
@@ -59,6 +60,8 @@
 | Connect AI Connection API | コネクション作成・リダイレクト |
 | Connect AI Metadata API | スキーマ・テーブル・カラム情報取得 |
 | Connect AI SQL API | SQLクエリ実行（SELECT/INSERT/UPDATE/DELETE） |
+| Connect AI MCP API | AI アシスタントのデータアクセス（Streamable HTTP） |
+| Claude API（Anthropic） | 自然言語処理・ツール使用（ユーザー個別 API Key） |
 
 ---
 
@@ -111,7 +114,7 @@ ConnectAIOEMSample/
 │   ├── config.py                 # 環境設定（パス解決含む）
 │   ├── models/
 │   │   ├── __init__.py           # DB初期化
-│   │   ├── user.py               # Userモデル
+│   │   ├── user.py               # Userモデル（claude_api_key_encrypted カラム含む）
 │   │   └── api_log.py            # ApiLogモデル
 │   ├── schemas/
 │   │   ├── user_schema.py        # ユーザー登録・ログインのスキーマ
@@ -124,7 +127,10 @@ ConnectAIOEMSample/
 │   │   ├── metadata_service.py   # Metadata API呼び出し
 │   │   ├── query_service.py      # SQL API呼び出し
 │   │   ├── data_service.py       # データCRUD操作
-│   │   └── api_log_service.py    # API ログ取得
+│   │   ├── api_log_service.py    # API ログ取得
+│   │   ├── crypto_service.py     # Fernet暗号化ユーティリティ（Phase 4）
+│   │   ├── mcp_client.py         # Connect AI MCP クライアント（Phase 4）
+│   │   └── claude_service.py     # Claude API + Agentic loop（Phase 4）
 │   ├── api/
 │   │   └── v1/
 │   │       ├── auth.py           # POST /api/v1/auth/*
@@ -132,7 +138,9 @@ ConnectAIOEMSample/
 │   │       ├── metadata.py       # GET /api/v1/metadata/*
 │   │       ├── query.py          # POST /api/v1/query/*
 │   │       ├── data.py           # /api/v1/data/*
-│   │       └── api_log.py        # GET /api/v1/api-logs
+│   │       ├── api_log.py        # GET /api/v1/api-logs
+│   │       ├── settings.py       # GET|POST /api/v1/settings/api-key（Phase 4）
+│   │       └── ai_assistant.py   # GET|POST /api/v1/ai-assistant/*（Phase 4）
 │   ├── connectai/
 │   │   ├── client.py             # Connect AI HTTP APIクライアント
 │   │   ├── jwt.py                # Connect AI用JWT生成（RS256）
@@ -163,7 +171,9 @@ ConnectAIOEMSample/
 │   │   ├── explorer.html
 │   │   ├── query.html
 │   │   ├── data-browser.html
-│   │   └── api-log.html
+│   │   ├── api-log.html
+│   │   ├── settings.html         # Claude API Key 設定画面（Phase 4）
+│   │   └── ai-assistant.html     # AI アシスタントチャット画面（Phase 4）
 │   └── static/
 │       └── js/
 │           ├── api-client.js     # バックエンドAPIとの通信クラス
@@ -300,6 +310,7 @@ class ConnectAIClient:
 | Metadata API | `GET /tables` | メタデータエクスプローラー・クエリビルダー |
 | Metadata API | `GET /columns` | メタデータエクスプローラー・データブラウザ |
 | SQL API | `POST /query` | クエリビルダー・データブラウザ（SELECT/INSERT/UPDATE/DELETE） |
+| MCP API | `https://mcp.cloud.cdata.com/mcp` | AI アシスタントのデータアクセス（Phase 4） |
 
 ---
 
@@ -362,6 +373,12 @@ CONNECT_AI_PRIVATE_KEY_PATH=backend/keys/private.key
 
 # コールバックURL（コネクション作成後のリダイレクト先）
 APP_BASE_URL=http://localhost:5001
+
+# AI アシスタント設定（Phase 4）
+# Claude API Key の暗号化に使用する Fernet キー（python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" で生成）
+ENCRYPTION_KEY=your-fernet-encryption-key
+# Connect AI MCP サーバー URL
+CONNECT_AI_MCP_URL=https://mcp.cloud.cdata.com/mcp
 ```
 
 ### 4.4 RSA鍵ペアの生成
@@ -400,6 +417,9 @@ cryptography==41.0.7
 
 # HTTPクライアント
 requests==2.31.0
+
+# AI アシスタント（Phase 4）
+anthropic          # Claude API クライアント
 
 # 環境変数
 python-dotenv==1.0.0
@@ -463,7 +483,18 @@ pytest-cov==4.1.0
 - コネクション一覧は `GET /poweredby/connection/list` API で取得します
 - アプリ側は `User` モデルの `connect_ai_account_id` を通じてテナント分離を実現します
 
-### 6.6 データソースの`name`について
+### 6.6 AI アシスタント（Phase 4）の技術的制約
+
+| 制約 | 内容 |
+|------|------|
+| Claude API Key 管理 | ユーザーごとに Fernet 対称暗号で暗号化して DB に保存。`ENCRYPTION_KEY` は環境変数で管理 |
+| MCP 接続プロトコル | Streamable HTTP（MCP over HTTP）のみ使用。WebSocket / SSE ではない |
+| MCP 認証 | OAuth JWT Bearer Token のみサポート。既存の Connect AI JWT を使用 |
+| Claude API Key | アプリ共有キーは使用しない。ユーザー個別のキーが必須 |
+| ストリーミング | SSE（Server-Sent Events）で Flask → ブラウザへリアルタイム送信 |
+| 会話履歴 | クライアントサイド（Alpine.js の `messages` 配列）で管理。サーバーはステートレス。DB への永続化は行わない |
+
+### 6.7 データソースの`name`について
 
 Connect AI Connection APIの`name`パラメータに指定した値が、その後のMetadata/SQL APIで`catalogName`として使用されます。コネクション名は英数字とハイフン・アンダースコアのみ使用することを推奨します（スペースや特殊文字を避ける）。
 

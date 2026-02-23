@@ -35,6 +35,9 @@ https://cloud.cdata.com/api
 - [メタデータAPI](./metadata-api.md) - スキーマ、テーブル、カラム情報の取得
 - [SQL API](./sql-api.md) - データのクエリ、更新、削除
 
+### AI連携
+- [MCP API](./mcp-api.md) - Model Context Protocol（Streamable HTTP）による AI アシスタント連携
+
 ---
 
 [← トップに戻る](./README.md)

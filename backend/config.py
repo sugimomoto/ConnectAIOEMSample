@@ -26,3 +26,7 @@ class Config:
         os.environ.get("CONNECT_AI_PRIVATE_KEY_PATH", "backend/keys/private.key")
     )
     APP_BASE_URL: str = os.environ.get("APP_BASE_URL", "http://localhost:5001")
+
+    # Claude API Key 暗号化キー（Fernet 対称暗号）
+    # `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` で生成
+    ENCRYPTION_KEY: str = os.environ.get("ENCRYPTION_KEY", "")

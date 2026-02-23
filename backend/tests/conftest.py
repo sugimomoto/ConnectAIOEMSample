@@ -1,23 +1,36 @@
 import pytest
 from unittest.mock import patch
+from sqlalchemy.pool import StaticPool
 from backend.app import create_app
 from backend.models import db as _db
 
 
 @pytest.fixture
 def app():
-    """テスト用Flaskアプリ（in-memory SQLite）"""
+    """テスト用Flaskアプリ（in-memory SQLite）
+
+    StaticPool を使用してすべての接続が同一の in-memory DB を共有するようにする。
+    アウターの app_context を保持しないことで、各リクエストが独立した g を持ち
+    Flask-Login のユーザーセッションがテストクライアント間で漏れないようにする。
+    """
+    from cryptography.fernet import Fernet
     app = create_app({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "SQLALCHEMY_ENGINE_OPTIONS": {
+            "connect_args": {"check_same_thread": False},
+            "poolclass": StaticPool,
+        },
         "SECRET_KEY": "test-secret-key",
         "WTF_CSRF_ENABLED": False,
         "CONNECT_AI_PARENT_ACCOUNT_ID": "test-parent-account-id",
         "CONNECT_AI_PRIVATE_KEY_PATH": "backend/keys/private.key",
+        "ENCRYPTION_KEY": Fernet.generate_key().decode(),
     })
     with app.app_context():
         _db.create_all()
-        yield app
+    yield app
+    with app.app_context():
         _db.drop_all()
 
 

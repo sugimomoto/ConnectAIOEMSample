@@ -106,4 +106,27 @@ class APIClient {
   async clearApiLogs() {
     return this.request('DELETE', '/api-logs');
   }
+
+  async getApiKeyStatus() {
+    return this.request('GET', '/settings/api-key/status');
+  }
+
+  async saveApiKey(apiKey) {
+    return this.request('POST', '/settings/api-key', { api_key: apiKey });
+  }
+
+  async deleteApiKey() {
+    return this.request('DELETE', '/settings/api-key');
+  }
+
+  async chatWithAI(message, catalogName = null) {
+    return this.request('POST', '/ai-assistant/chat', {
+      message,
+      catalog_name: catalogName,
+    });
+  }
+
+  async resetChat() {
+    return this.request('POST', '/ai-assistant/reset');
+  }
 }
