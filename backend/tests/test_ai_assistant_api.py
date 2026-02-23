@@ -192,6 +192,24 @@ class TestAiAssistantChat:
         assert "text_delta" in event_types
         assert "done" in event_types
 
+    def test_no_tool_events_when_no_tool_calls(self, client, app):
+        _register_and_login(client)
+        _set_api_key(app)
+
+        def mock_stream(api_key, jwt_token, messages, catalog_name=None):
+            yield "text_delta", {"text": "こんにちは！"}
+            yield "done", {"message": "complete", "answer": "こんにちは！"}
+
+        with patch("backend.api.v1.ai_assistant.generate_connect_ai_jwt", return_value="tok"), \
+             patch("backend.services.claude_service.stream_chat", side_effect=mock_stream):
+            resp = client.post("/api/v1/ai-assistant/chat", json={"message": "こんにちは"})
+
+        events = _parse_sse(resp.data)
+        event_types = [e["type"] for e in events]
+        assert "tool_start" not in event_types
+        assert "tool_result" not in event_types
+        assert "text_delta" in event_types
+
 
 # ---------------------------------------------------------------------------
 # 正常系: クライアントサイド履歴
