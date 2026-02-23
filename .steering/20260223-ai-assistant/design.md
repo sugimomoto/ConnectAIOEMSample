@@ -96,63 +96,65 @@ session['chat_history'] = [
 
 ## MCP ツール定義
 
-Claude に渡す MCP ツール定義（Anthropic SDK の `tools` パラメータ形式）:
+### 動的取得方式の採用
+
+ツール定義は **MCP サーバーから動的に取得** する。
+
+ハードコーディングではなく MCP 標準の `tools/list` メソッドを呼び出し、取得したツール定義を Claude の `tools` パラメータとして渡す。
+
+**メリット：**
+- MCP サーバー側でツールが追加・変更されても自動で追従できる
+- 静的な定義ファイル（`mcp_tools.py`）の管理が不要
+- 常に最新のツールスキーマを利用できる
+
+### tools/list の呼び出し
+
+MCP の JSON-RPC で `tools/list` メソッドを呼び出す：
 
 ```python
-MCP_TOOLS = [
-    {
-        "name": "getCatalogs",
-        "description": "利用可能なコネクション（カタログ）一覧を取得する",
-        "input_schema": {"type": "object", "properties": {}, "required": []}
-    },
-    {
-        "name": "getSchemas",
-        "description": "指定カタログのスキーマ一覧を取得する",
-        "input_schema": {
-            "type": "object",
-            "properties": {"catalogName": {"type": "string"}},
-            "required": ["catalogName"]
-        }
-    },
-    {
-        "name": "getTables",
-        "description": "指定カタログ・スキーマのテーブル一覧を取得する",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "catalogName": {"type": "string"},
-                "schemaName": {"type": "string"}
-            },
-            "required": ["catalogName", "schemaName"]
-        }
-    },
-    {
-        "name": "getColumns",
-        "description": "指定テーブルのカラム一覧を取得する",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "catalogName": {"type": "string"},
-                "schemaName": {"type": "string"},
-                "tableName": {"type": "string"}
-            },
-            "required": ["catalogName", "schemaName", "tableName"]
-        }
-    },
-    {
-        "name": "queryData",
-        "description": "SQL クエリを実行してデータを取得する",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {"type": "string", "description": "実行する SELECT 文"},
-                "parameters": {"type": "object", "description": "@param 形式のパラメータ"}
-            },
-            "required": ["query"]
-        }
+# mcp_client.py
+def list_tools(self, jwt_token: str) -> list[dict]:
+    """MCP サーバーからツール定義一覧を取得し、Anthropic 形式に変換して返す"""
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "tools/list",
+        "params": {},
+        "id": 1
     }
-]
+    response = requests.post(MCP_BASE_URL, json=payload, headers={"Authorization": f"Bearer {jwt_token}"})
+    mcp_tools = response.json()["result"]["tools"]
+    return [self._convert_to_anthropic_format(t) for t in mcp_tools]
 ```
+
+### フォーマット変換（MCP → Anthropic）
+
+MCP と Anthropic SDK でキー名が異なる。`inputSchema`（camelCase）→ `input_schema`（snake_case）に変換が必要。
+
+```python
+def _convert_to_anthropic_format(self, mcp_tool: dict) -> dict:
+    return {
+        "name": mcp_tool["name"],
+        "description": mcp_tool.get("description", ""),
+        "input_schema": mcp_tool["inputSchema"]
+    }
+```
+
+### キャッシュ戦略
+
+ツール定義は MCP サーバー起動中は変わらないため、アプリケーション起動時に一度取得してインメモリにキャッシュする。
+
+```python
+# app.py 起動時 or claude_service.py の初期化時
+_cached_tools: list[dict] | None = None
+
+def get_mcp_tools(jwt_token: str) -> list[dict]:
+    global _cached_tools
+    if _cached_tools is None:
+        _cached_tools = mcp_client.list_tools(jwt_token)
+    return _cached_tools
+```
+
+> **注意**: キャッシュはアプリ再起動でリセットされる。ツール定義の変更を反映するにはアプリ再起動が必要（現フェーズはこれで十分）。
 
 ---
 

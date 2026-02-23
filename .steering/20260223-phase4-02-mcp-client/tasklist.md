@@ -23,10 +23,11 @@
 - [ ] 各ツール呼び出しで `accountId` を使いテナント分離を維持する
 - [ ] エラーハンドリング（接続エラー・認証エラー・クエリエラー）
 
-### MCP ツール定義
-- [ ] `backend/services/mcp_tools.py` を新規作成
-  - Claude API の `tools` パラメータ用ツール定義リスト（JSON Schema 形式）
-  - 各ツールの `name`, `description`, `input_schema` を定義
+### MCP ツール定義（動的取得）
+- [ ] `backend/services/mcp_client.py` に `list_tools(jwt_token)` メソッドを追加
+  - MCP `tools/list` JSON-RPC メソッドを呼び出してツール一覧を取得
+  - MCP 形式（`inputSchema`）→ Anthropic 形式（`input_schema`）に変換して返す
+  - アプリケーション起動時にキャッシュする仕組みを追加
 
 ### 動作確認
 - [ ] Python スクリプトや Flask shell で各 MCP ツールを直接呼び出して動作を確認
