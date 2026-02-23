@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ダッシュボード - DataHub</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/header.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen"
@@ -22,16 +23,8 @@
       }">
 
   <!-- ヘッダー -->
-  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
-    <div class="flex items-center gap-4">
-      <span x-show="user" class="text-sm text-gray-600" x-text="user?.name"></span>
-      <button @click="logout()"
-              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
-        ログアウト
-      </button>
-    </div>
-  </header>
+  <div id="app-header"></div>
+  <script>renderAppHeader('dashboard');</script>
 
   <!-- メインコンテンツ -->
   <main class="max-w-4xl mx-auto px-6 py-8">
@@ -95,6 +88,16 @@
           <div>
             <p class="text-sm font-medium text-gray-800">データブラウザ</p>
             <p class="text-xs text-gray-400 mt-0.5">レコードの閲覧・作成・編集・削除を行う</p>
+          </div>
+          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+          </svg>
+        </a>
+        <a href="/api-log"
+           class="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors mt-2">
+          <div>
+            <p class="text-sm font-medium text-gray-800">API ログ</p>
+            <p class="text-xs text-gray-400 mt-0.5">Connect AI へのリクエスト・レスポンスを確認する</p>
           </div>
           <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>

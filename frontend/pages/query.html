@@ -5,21 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>クエリビルダー - DataHub</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/static/js/header.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 </head>
 <body class="bg-gray-50 min-h-screen" x-data="queryBuilderData()">
 
   <!-- ヘッダー -->
-  <header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-    <h1 class="text-xl font-bold text-gray-800">DataHub</h1>
-    <div class="flex items-center gap-4">
-      <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-800">ダッシュボード</a>
-      <button @click="logout()"
-              class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg transition-colors">
-        ログアウト
-      </button>
-    </div>
-  </header>
+  <div id="app-header"></div>
+  <script>renderAppHeader('query');</script>
 
   <!-- メインコンテンツ -->
   <main class="max-w-screen-xl mx-auto px-6 py-6">

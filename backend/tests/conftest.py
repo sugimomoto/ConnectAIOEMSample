@@ -90,6 +90,22 @@ def mock_connect_ai_crud():
 
 
 @pytest.fixture
+def second_user_client(app):
+    """2人目のユーザーを登録・ログインした専用クライアントを返す（ユーザー分離テスト用）"""
+    client2 = app.test_client()
+    client2.post("/api/v1/auth/register", json={
+        "email": "other@example.com",
+        "password": "password123",
+        "name": "Other User",
+    })
+    client2.post("/api/v1/auth/login", json={
+        "email": "other@example.com",
+        "password": "password123",
+    })
+    return client2
+
+
+@pytest.fixture
 def mock_connect_ai_connections():
     """Connect AI コネクション関連 API をモックする"""
     with patch("backend.connectai.client.ConnectAIClient.get_datasources") as mock_ds, \
