@@ -20,33 +20,19 @@ https://mcp.cloud.cdata.com/mcp
 
 ## 認証
 
-Connect AI MCP サーバーは以下の認証方式をサポートしています。
+本アプリケーションでは **OAuth JWT Bearer Token 認証**のみをサポートします。
 
-### OAuth（JWT Bearer Token）認証（Embedded Cloud / OEM向け推奨）
+### OAuth（JWT Bearer Token）認証
 
-OEM 構成（Powered-by API）では、既存の JWT Bearer Token 認証を使用します。
+OEM 構成（Powered-by API）の JWT トークンを使用します。
 
 ```http
 Authorization: Bearer {JWT_TOKEN}
 ```
 
+JWT トークンの `sub` クレームに子アカウントの `accountId` を設定することで、テナント分離も同時に実現されます。
+
 JWT トークンの生成方法は [認証ドキュメント](./authentication.md) を参照してください。
-
-### Basic認証
-
-Connect AI ユーザーID と PAT（Personal Access Token）を Base64 エンコードして使用します。
-
-```http
-Authorization: Basic {Base64Encoded_EMAIL:PAT}
-```
-
-**Base64エンコード例：**
-```
-email@example.com:your-pat-token
-→ Base64エンコード → ZW1haWxAZXhhbXBsZS5jb206eW91ci1wYXQtdG9rZW4=
-```
-
-PAT は Connect AI の **Settings > Access Tokens** ページで生成できます。
 
 ---
 
@@ -175,13 +161,6 @@ Claude Code / Anthropic Python SDK を使ってバックエンドから MCP サ�
 
 ### claude mcp add コマンド（CLI接続設定）
 
-```bash
-claude mcp add --transport http connectmcp \
-  https://mcp.cloud.cdata.com/mcp \
-  --header "Authorization: Basic {Base64Encoded_EMAIL:PAT}"
-```
-
-OEM（JWT）認証の場合：
 ```bash
 claude mcp add --transport http connectmcp \
   https://mcp.cloud.cdata.com/mcp \

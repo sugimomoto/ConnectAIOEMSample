@@ -21,10 +21,12 @@
     │  ツール呼び出し（MCP ツール定義）
     ▼
 [Flask バックエンド] ← MCPクライアントとして動作
-    │  CData Connect AI MCP HTTP リクエスト
-    │  accountId によるテナント分離
+    │  Streamable HTTP（MCP over HTTP）
+    │  Authorization: Bearer {JWT_TOKEN}
+    │  JWT sub = accountId（テナント分離）
     ▼
 [CData Connect AI MCP サーバー]
+    https://mcp.cloud.cdata.com/mcp
 ```
 
 ### 通信フロー
