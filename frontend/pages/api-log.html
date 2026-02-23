@@ -57,9 +57,9 @@
           <tr>
             <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">タイムスタンプ</th>
             <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-20">メソッド</th>
-            <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">エンドポイント</th>
             <th class="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-24">ステータス</th>
-            <th class="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-24">処理時間</th>
+            <th class="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide w-24">処理時間</th>
+            <th class="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">エンドポイント</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
@@ -73,14 +73,14 @@
                       :class="methodColor(log.method)"
                       x-text="log.method"></span>
               </td>
-              <td class="px-4 py-3 text-gray-700 font-mono text-xs" x-text="log.endpoint"></td>
               <td class="px-4 py-3">
                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold"
                       :class="statusColor(log.status_code)"
                       x-text="log.status_code"></span>
               </td>
-              <td class="px-6 py-3 text-right text-gray-500 font-mono text-xs"
+              <td class="px-4 py-3 text-right text-gray-500 font-mono text-xs"
                   x-text="`${log.elapsed_ms} ms`"></td>
+              <td class="px-6 py-3 text-gray-700 font-mono text-xs" x-text="log.endpoint"></td>
             </tr>
           </template>
         </tbody>
