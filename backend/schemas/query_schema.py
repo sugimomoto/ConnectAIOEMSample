@@ -11,7 +11,6 @@ class ConditionSchema(BaseModel):
 
 
 class QueryRequestSchema(BaseModel):
-    connection_id: str
     catalog_name: str
     schema_name: str
     table_name: str
