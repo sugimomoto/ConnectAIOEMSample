@@ -35,6 +35,28 @@
   - **親アカウント ID**
   - アカウントに登録済みの **RSA 秘密鍵**（PEM 形式）
 
+### RSA 鍵ペアの準備
+
+Connect AI API へのすべてのリクエストは、**RS256 アルゴリズムで署名した JWT** による認証が必要です。JWT の署名には RSA 形式の秘密鍵・公開鍵ペアを使用します。
+
+鍵ペアの生成には複数の方法がありますが、以下は OpenSSL を使った例です。
+
+**秘密鍵の生成（PEM 形式）:**
+
+```bash
+openssl genrsa -out private.key 4096
+```
+
+**公開鍵の生成（PEM 形式）:**
+
+```bash
+openssl rsa -in private.key -pubout -outform PEM -out public.key
+```
+
+生成した `public.key` の内容を CData サポートチームへ登録してください（必須）。
+
+> **注意:** 秘密鍵（`private.key`）は厳重に管理してください。CData が秘密鍵を要求することはありません。また、お客様のエンドユーザーと共有しないでください。
+
 ---
 
 ## セットアップ
