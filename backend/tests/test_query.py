@@ -117,6 +117,27 @@ def test_execute_query_connect_ai_error(client, mock_connect_ai_query):
 
 
 # ---------------------------------------------------------------------------
+# connection_id 不整合バグの修正確認（Issue #14）
+# ---------------------------------------------------------------------------
+
+def test_execute_query_without_connection_id(client, mock_connect_ai_query):
+    """フロントエンドの実際の送信形式（connection_id なし）でクエリが実行できること。
+    Issue #14: QueryRequestSchema の connection_id 必須フィールドが原因で
+    フロントエンドから VALIDATION_ERROR が返っていたバグの回帰テスト。
+    """
+    _register_and_login(client)
+    resp = client.post("/api/v1/query", json={
+        # connection_id を送らない（フロントエンドの実際の挙動と同じ）
+        "catalog_name": "Salesforce1",
+        "schema_name": "dbo",
+        "table_name": "Account",
+        "columns": [],
+        "conditions": [],
+    })
+    assert resp.status_code == 200
+
+
+# ---------------------------------------------------------------------------
 # SQL 組み立て単体テスト
 # ---------------------------------------------------------------------------
 
