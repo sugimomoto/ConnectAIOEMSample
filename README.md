@@ -13,6 +13,20 @@
 | **データブラウザー** | カラムメタデータから動的生成されたフォームによるレコードの一覧・作成・編集・削除 |
 | **AI アシスタント** | 自然言語でデータを問い合わせる MCP チャット。SSE でトークンをリアルタイム表示し、ツール呼び出し履歴をアコーディオン UI で可視化 |
 
+## 画面イメージ
+
+| コネクション管理 | クエリビルダー |
+|---|---|
+| ![コネクション管理](images/image0.png) | ![クエリビルダー](images/image3.png) |
+
+| データブラウザ | API ログ |
+|---|---|
+| ![データブラウザ](images/image1.png) | ![API ログ](images/image4.png) |
+
+**AI アシスタント**（MCP ツール呼び出し可視化）
+
+![AI アシスタント](images/image2.png)
+
 ---
 
 ## 前提条件
@@ -217,14 +231,12 @@ pytest tests/
 ConnectAIOEMSample/
 ├── .devcontainer/       # DevContainer / GitHub Codespaces 設定
 ├── backend/
-│   ├── api/v1/          # Flask ルートハンドラー（auth, connections, metadata, query, data,
-│   │                    #   settings, ai_assistant）
-│   ├── connectai/       # CData Connect AI API クライアント・JWT 生成
-│   ├── models/          # SQLAlchemy モデル（User, ApiLog）
+│   ├── api/v1/          # Flask ルートハンドラー（auth, connections, metadata, query, data）
+│   ├── connectai/       # CData Connect AI API クライアント
+│   ├── models/          # SQLAlchemy モデル（User）
 │   ├── schemas/         # Pydantic リクエストバリデーションスキーマ
-│   ├── services/        # ビジネスロジック（ConnectionService, MetadataService,
-│   │                    #   crypto_service, mcp_client, claude_service など）
-│   ├── tests/           # pytest テストスイート（135 テスト）
+│   ├── services/        # ビジネスロジック（ConnectionService, MetadataService など）
+│   ├── tests/           # pytest テストスイート
 │   ├── keys/            # RSA 秘密鍵（バージョン管理対象外）
 │   ├── .env             # 環境変数（バージョン管理対象外）
 │   ├── .env.example     # 環境変数のテンプレート
