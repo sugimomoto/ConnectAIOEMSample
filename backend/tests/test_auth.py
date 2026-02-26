@@ -57,6 +57,12 @@ def test_register_saves_child_account_id(client, app):
         assert user.connect_ai_account_id == "mock-child-account-id-001"
 
 
+def test_register_uses_email_as_external_id(client, mock_connect_ai):
+    """externalId としてメールアドレスが Connect AI API に渡されること"""
+    _register(client, email="user@example.com")
+    mock_connect_ai.assert_called_once_with("user@example.com")
+
+
 def test_register_password_is_hashed(client, app):
     """パスワードが平文でなくbcryptハッシュとしてDBに保存されること"""
     _register(client, password="mysecretpass")

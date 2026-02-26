@@ -92,7 +92,7 @@ CDataとの契約により **OEMパートナー（本プロジェクト）** に
 Connect AIにおけるテナント分離の単位となる。
 
 - ユーザー登録時に **Account API** (`POST /poweredby/account/create`) を呼び出して作成される
-- 作成時に `externalId`（本アプリの `users.id` を文字列化した値）を指定する
+- 作成時に `externalId`（本アプリの `users.email`）を指定する
 - Connect AIから返却される `ChildAccountId` を `users.connect_ai_account_id` カラムに保存する
 - `ChildAccountId` は JWT の `sub`（subject）クレームに設定する
 
@@ -101,10 +101,10 @@ Connect AIにおけるテナント分離の単位となる。
 ### externalId（外部ID）
 
 子アカウント作成時にOEMパートナーが指定する識別子。Connect AI側でユーザーを特定するための参照キー。
-本プロジェクトでは `users.id`（整数）を文字列変換して使用する。
+本プロジェクトでは `users.email`（メールアドレス）を使用する。環境再構築時も値が変わらず、DB の `UNIQUE` 制約により衝突しない。
 
 ```python
-external_id = str(user.id)  # 例: "42"
+external_id = user.email  # 例: "alice@example.com"
 ```
 
 ### ChildAccountId（子アカウントID）
