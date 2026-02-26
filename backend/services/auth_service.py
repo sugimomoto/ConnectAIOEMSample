@@ -31,7 +31,7 @@ class AuthService:
         error_msg = None
         try:
             client = ConnectAIClient(child_account_id=None)
-            child_account_id = client.create_account(str(user.id))
+            child_account_id = client.create_account(user.email)
             user.connect_ai_account_id = child_account_id
             db.session.commit()
         except ConnectAIError as e:
